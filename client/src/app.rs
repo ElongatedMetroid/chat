@@ -11,7 +11,7 @@ use chat_core::{
     read::ChatReader,
     write::ChatWriter,
 };
-use egui::{CentralPanel, Key, ScrollArea, TextEdit, Window};
+use egui::{CentralPanel, Key, Modifiers, ScrollArea, TextEdit, Window};
 
 pub struct App {
     client: Arc<Mutex<TcpStream>>,
@@ -68,6 +68,7 @@ impl eframe::App for App {
             Window::new("chat1").show(ctx, |ui| {
                 ScrollArea::vertical()
                     .id_source("messages")
+                    .auto_shrink([false, false])
                     .max_height(ui.available_height() / 1.5)
                     .max_width(f32::INFINITY)
                     .show(ui, |ui| {
@@ -86,7 +87,15 @@ impl eframe::App for App {
                     })
                     .inner;
 
-                if ui.ctx().input(|i| i.key_pressed(Key::Enter)) && response.has_focus() {
+                if ui.input(|i| {
+                    i.modifiers.matches(Modifiers::SHIFT) && i.key_pressed(Key::Enter)
+                }) {
+                    self.message_text.push('\n');
+                }
+
+                if ui.input(|i| {
+                    i.key_pressed(Key::Enter) && response.has_focus() && !i.modifiers.matches(Modifiers::SHIFT)
+                }) {
                     self.client
                         .lock()
                         .unwrap()
