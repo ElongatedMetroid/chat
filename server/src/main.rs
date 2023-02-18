@@ -65,16 +65,26 @@ fn handle_client(
     clients: Arc<Mutex<Vec<TcpStream>>>,
     tx: Arc<Mutex<mpsc::Sender<Message>>>,
 ) {
-    clients.lock().unwrap()[index]
-        .set_nonblocking(true)
-        .unwrap();
-    let peer_address = clients.lock().unwrap()[index].peer_addr().unwrap();
+    let peer_address = match clients.lock().unwrap()[index].peer_addr() {
+        Ok(peer_address) => peer_address,
+        Err(error) => {
+            eprintln!("Failed to get peer_address: {error}");
+            clients.lock().unwrap().remove(index);
+            return;
+        }
+    };
+    if let Err(error) = clients.lock().unwrap()[index].set_nonblocking(true) {
+        eprintln!("Failed to set {peer_address} to non_blocking: {error}");
+        clients.lock().unwrap().remove(index);
+        return;
+    }
+
     println!("New client connected: {}", peer_address);
 
     loop {
         thread::sleep(Duration::from_millis(500));
         // Read message
-        let message = clients.lock().unwrap()[index].read_message();
+        let message = clients.lock().unwrap()[index].read_data();
         let message = match message {
             Ok(message) => message,
             Err(error) => match *error {
