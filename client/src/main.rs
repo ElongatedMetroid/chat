@@ -1,11 +1,20 @@
-use std::net::TcpStream;
+use std::{
+    net::TcpStream,
+    sync::{Arc, Mutex},
+};
 
-use chat_core::{write::ChatWriter, message::{Message, Value}};
+use client::app::App;
+use eframe::{run_native, NativeOptions};
 
 fn main() {
-    let mut stream = TcpStream::connect("127.0.0.1:1234").unwrap();
+    let native_options = NativeOptions::default();
+    let messages = Arc::new(Mutex::new(Vec::new()));
+    let client = Arc::new(Mutex::new(TcpStream::connect("127.0.0.1:1234").unwrap()));
 
-    stream.write_message(Message {
-        payload: Value::Integer(7) 
-    }).unwrap();
+    run_native(
+        "chat",
+        native_options,
+        Box::new(|cc| Box::new(App::new(client, messages, cc))),
+    )
+    .unwrap();
 }
