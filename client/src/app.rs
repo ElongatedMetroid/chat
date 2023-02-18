@@ -1,7 +1,9 @@
 use std::{
+    io,
     net::TcpStream,
     sync::{Arc, Mutex},
-    thread, io, time::Duration,
+    thread,
+    time::Duration,
 };
 
 use chat_core::{
@@ -28,31 +30,27 @@ impl App {
         thread::spawn({
             let client = Arc::clone(&client);
             let messages = Arc::clone(&messages);
-            move || {
-                loop {
-                    thread::sleep(Duration::from_millis(500));
-                    let message = client.lock().unwrap().read_message();
-                    let message = match message {
-                        Ok(message) => message,
-                        Err(error) => {
-                            match *error {
-                                bincode::ErrorKind::Io(error) => {
-                                    if error.kind() == io::ErrorKind::WouldBlock {
-                                        continue
-                                    }
-                                    eprintln!("Io Error: {error}");
-                                    break;
-                                },
-                                _ => {
-                                    eprintln!("Lost connection to server: {error}");
-                                    break;
-                                },
+            move || loop {
+                thread::sleep(Duration::from_millis(500));
+                let message = client.lock().unwrap().read_data();
+                let message = match message {
+                    Ok(message) => message,
+                    Err(error) => match *error {
+                        bincode::ErrorKind::Io(error) => {
+                            if error.kind() == io::ErrorKind::WouldBlock {
+                                continue;
                             }
-                        },
-                    };
+                            eprintln!("Io Error: {error}");
+                            break;
+                        }
+                        _ => {
+                            eprintln!("Lost connection to server: {error}");
+                            break;
+                        }
+                    },
+                };
 
-                    messages.lock().unwrap().push(message);
-                }
+                messages.lock().unwrap().push(message);
             }
         });
 
@@ -92,7 +90,7 @@ impl eframe::App for App {
                     self.client
                         .lock()
                         .unwrap()
-                        .write_message(&Message {
+                        .write_data(&Message {
                             username: String::from("Joe Smoe"),
                             payload: Value::String(self.message_text.clone()),
                         })
