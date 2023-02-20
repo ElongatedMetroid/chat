@@ -12,7 +12,7 @@ use chat_core::{
     read::ChatReader,
     write::ChatWriter,
 };
-use egui::{CentralPanel, Key, Modifiers, ScrollArea, TextEdit, Window, Response};
+use egui::{CentralPanel, Key, Modifiers, ScrollArea, TextEdit, Window};
 
 pub struct App {
     client: Arc<Mutex<TcpStream>>,
@@ -52,11 +52,11 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // TODO: Only request repaint when a new message arrives
         ctx.request_repaint();
-        
+
         CentralPanel::default().show(ctx, |_ui| {
             Window::new("chat1").show(ctx, |ui| {
                 // Messages scroll area
-                let resopnse = ScrollArea::vertical()
+                ScrollArea::vertical()
                     .id_source("messages")
                     .auto_shrink([false, false])
                     .max_height(ui.available_height() / 1.5)
@@ -68,14 +68,17 @@ impl eframe::App for App {
                         }
                     });
 
-                // /resopnse.
-
                 ui.separator();
+
+                if self.message_text.bytes().len() as u64 > ChatWriter::byte_limit(&(*self.client.lock().unwrap())) {
+                    ui.label("Message Too Long!");
+                    ui.separator();
+                }
 
                 // Send message text scroll area
                 let response = ScrollArea::vertical()
                     .max_height(5.0)
-                    .show(ui, |ui| {
+                    .show(ui, |ui| {  
                         ui.add(TextEdit::multiline(&mut self.message_text).desired_rows(2))
                     })
                     .inner;
@@ -97,11 +100,8 @@ impl eframe::App for App {
 
                     println!("{message:?}");
 
-                    self.client
-                        .lock()
-                        .unwrap()
-                        .write_data(&message)
-                        .unwrap();
+                    self.client.lock().unwrap().write_data(&message).unwrap();
+                
                     self.message_text = String::new();
                 }
             });
@@ -109,7 +109,10 @@ impl eframe::App for App {
     }
 }
 
-fn check_new_messages(client: Arc<Mutex<TcpStream>>, messages: Arc<Mutex<Vec<Message>>>) -> Result<(), bincode::Error> {
+fn check_new_messages(
+    client: Arc<Mutex<TcpStream>>,
+    messages: Arc<Mutex<Vec<Message>>>,
+) -> Result<(), bincode::Error> {
     loop {
         thread::sleep(Duration::from_millis(250));
         let message = client.lock().unwrap().read_data::<Message>();
