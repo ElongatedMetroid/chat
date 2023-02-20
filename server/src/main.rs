@@ -7,7 +7,7 @@ use std::{
         Arc, Mutex,
     },
     thread,
-    time::Duration,
+    time::Duration, collections::HashMap,
 };
 
 use chat_core::{message::Message, read::ChatReader, write::ChatBroadcaster};
@@ -25,7 +25,7 @@ fn main() {
             eprintln!("Failed to create threadpool: {e}");
             process::exit(1);
         });
-    let clients = Arc::new(Mutex::new(Vec::new()));
+    let clients = Arc::new(Mutex::new(HashMap::new()));
 
     let (tx, rx) = mpsc::channel();
 
@@ -39,18 +39,19 @@ fn main() {
     });
 
     let tx = Arc::new(Mutex::new(tx));
+
+    let mut key = 0;
     for stream in listener.incoming() {
+        key += 1;
         match stream {
             Ok(stream) => {
-                // Get index of where our client will be before pushing it since indexing starts at 0
-                let index = clients.lock().unwrap().len();
-                clients.lock().unwrap().push(stream);
+                clients.lock().unwrap().insert(key, stream);
 
                 pool.spawn({
                     let clients = Arc::clone(&clients);
                     let tx = Arc::clone(&tx);
 
-                    move || handle_client(index, clients, tx)
+                    move || handle_client(key, clients, tx)
                 });
             }
             Err(e) => {
@@ -61,30 +62,31 @@ fn main() {
 }
 
 fn handle_client(
-    index: usize,
-    clients: Arc<Mutex<Vec<TcpStream>>>,
+    key: usize,
+    clients: Arc<Mutex<HashMap<usize, TcpStream>>>,
     tx: Arc<Mutex<mpsc::Sender<Message>>>,
 ) {
-    let peer_address = match clients.lock().unwrap()[index].peer_addr() {
+    let peer_address = match clients.lock().unwrap().get(&key).unwrap().peer_addr() {
         Ok(peer_address) => peer_address,
         Err(error) => {
             eprintln!("Failed to get peer_address: {error}");
-            clients.lock().unwrap().remove(index);
+            clients.lock().unwrap().remove(&key);
             return;
         }
     };
-    if let Err(error) = clients.lock().unwrap()[index].set_nonblocking(true) {
+    if let Err(error) = clients.lock().unwrap().get(&key).unwrap().set_nonblocking(true) {
         eprintln!("Failed to set {peer_address} to non_blocking: {error}");
-        clients.lock().unwrap().remove(index);
+        clients.lock().unwrap().remove(&key);
         return;
     }
 
-    println!("New client connected: {}", peer_address);
+    println!("New client connected: {}, {}", peer_address, key);
 
     loop {
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(250));
         // Read message
-        let message = clients.lock().unwrap()[index].read_data();
+        let message = clients.lock().unwrap().get_mut(&key).unwrap().read_data();
+
         let message = match message {
             Ok(message) => message,
             Err(error) => match *error {
@@ -92,7 +94,7 @@ fn handle_client(
                     continue
                 }
                 _ => {
-                    eprintln!("Lost connection to client {peer_address}: {error}");
+                    eprintln!("Dropped/Lost connection to client {peer_address}: {error}");
                     break;
                 }
             },
@@ -107,10 +109,10 @@ fn handle_client(
         }
     }
 
-    clients.lock().unwrap().remove(index);
+    clients.lock().unwrap().remove(&key);
 }
 
-fn broadcast_messages(rx: Receiver<Message>, clients: Arc<Mutex<Vec<TcpStream>>>) {
+fn broadcast_messages(rx: Receiver<Message>, clients: Arc<Mutex<HashMap<usize, TcpStream>>>) {
     loop {
         let message = match rx.recv() {
             Ok(message) => message,
