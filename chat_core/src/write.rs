@@ -3,7 +3,7 @@ use std::{net::TcpStream, collections::HashMap};
 use bincode::{DefaultOptions, Options};
 use serde::{Deserialize, Serialize};
 
-use crate::message::Message;
+use crate::value::Value;
 
 pub trait ChatWriter {
     fn write_data<T>(&mut self, data: &T) -> Result<(), bincode::Error>
@@ -29,11 +29,12 @@ impl ChatWriter for TcpStream {
 }
 
 pub trait ChatBroadcaster {
-    fn broadcast(&mut self, message: &Message) -> Result<(), bincode::Error>;
+    fn broadcast(&mut self, message: &Value) -> Result<(), bincode::Error>;
 }
 
 impl<T> ChatBroadcaster for HashMap<T, TcpStream> {
-    fn broadcast(&mut self, message: &Message) -> Result<(), bincode::Error> {
+    /// Broadcast a 
+    fn broadcast(&mut self, message: &Value) -> Result<(), bincode::Error> {
         for client in self.values_mut() {
             client.write_data(message)?;
         }
@@ -44,7 +45,7 @@ impl<T> ChatBroadcaster for HashMap<T, TcpStream> {
 
 impl ChatBroadcaster for Vec<TcpStream> {
     /// Broadcast a Message to all TcpStreams in the Vec
-    fn broadcast(&mut self, message: &Message) -> Result<(), bincode::Error> {
+    fn broadcast(&mut self, message: &Value) -> Result<(), bincode::Error> {
         for client in self {
             client.write_data(message)?;
         }

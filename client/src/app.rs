@@ -8,22 +8,22 @@ use std::{
 };
 
 use chat_core::{
-    message::{Message, Value},
     read::ChatReader,
-    write::ChatWriter,
+    write::ChatWriter, request::{Request, Requesting}, value::Value,
 };
 use egui::{CentralPanel, Key, Modifiers, ScrollArea, TextEdit, Window};
 
 pub struct App {
     client: Arc<Mutex<TcpStream>>,
-    messages: Arc<Mutex<Vec<Message>>>,
+    messages: Arc<Mutex<Vec<Value>>>,
     message_text: String,
 }
-
+// TODO: Client - Gui
+// TODO: Server - Usernames
 impl App {
     pub fn new(
         client: Arc<Mutex<TcpStream>>,
-        messages: Arc<Mutex<Vec<Message>>>,
+        messages: Arc<Mutex<Vec<Value>>>,
         _cc: &eframe::CreationContext<'_>,
     ) -> Self {
         client.lock().unwrap().set_nonblocking(true).unwrap();
@@ -93,15 +93,13 @@ impl eframe::App for App {
                         && response.has_focus()
                         && !i.modifiers.matches(Modifiers::SHIFT)
                 }) {
-                    let message = Message {
-                        username: String::from("Joe Smoe"),
-                        payload: Value::String(self.message_text.clone()),
-                    };
+                    let request = Request::builder()
+                        .requesting(Requesting::SendMessage)
+                        .payload(Value::String(self.message_text.clone()))
+                        .build();
 
-                    println!("{message:?}");
-
-                    self.client.lock().unwrap().write_data(&message).unwrap();
-                
+                    self.client.lock().unwrap().write_data(&request).unwrap();
+                    // Fix this trash later
                     self.message_text = String::new();
                 }
             });
@@ -111,11 +109,11 @@ impl eframe::App for App {
 
 fn check_new_messages(
     client: Arc<Mutex<TcpStream>>,
-    messages: Arc<Mutex<Vec<Message>>>,
+    messages: Arc<Mutex<Vec<Value>>>,
 ) -> Result<(), bincode::Error> {
     loop {
         thread::sleep(Duration::from_millis(250));
-        let message = client.lock().unwrap().read_data::<Message>();
+        let message = client.lock().unwrap().read_data::<Value>();
         messages.lock().unwrap().push(match message {
             Ok(message) => message,
             Err(error) => match *error {
