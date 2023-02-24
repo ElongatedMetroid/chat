@@ -48,6 +48,9 @@ impl RequestBuilder {
     /// # Panics
     /// If you did not set a value for `requesting` this method will panic
     pub fn build(self) -> Request {
-        Request { requesting: self.requesting.unwrap(), payload: self.payload }
+        Request {
+            requesting: self.requesting.unwrap(),
+            payload: self.payload,
+        }
     }
 }

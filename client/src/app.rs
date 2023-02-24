@@ -9,13 +9,13 @@ use std::{
 
 use chat_core::{
     read::ChatReader,
-    write::ChatWriter, request::{Request, Requesting}, value::Value,
+    write::ChatWriter, request::{Request, Requesting}, message::Message, value::Value,
 };
 use egui::{CentralPanel, Key, Modifiers, ScrollArea, TextEdit, Window};
 
 pub struct App {
     client: Arc<Mutex<TcpStream>>,
-    messages: Arc<Mutex<Vec<Value>>>,
+    messages: Arc<Mutex<Vec<Message>>>,
     message_text: String,
 }
 // TODO: Client - Gui
@@ -23,7 +23,7 @@ pub struct App {
 impl App {
     pub fn new(
         client: Arc<Mutex<TcpStream>>,
-        messages: Arc<Mutex<Vec<Value>>>,
+        messages: Arc<Mutex<Vec<Message>>>,
         _cc: &eframe::CreationContext<'_>,
     ) -> Self {
         client.lock().unwrap().set_nonblocking(true).unwrap();
@@ -93,14 +93,16 @@ impl eframe::App for App {
                         && response.has_focus()
                         && !i.modifiers.matches(Modifiers::SHIFT)
                 }) {
+                    
+
                     let request = Request::builder()
                         .requesting(Requesting::SendMessage)
-                        .payload(Value::String(self.message_text.clone()))
+                        .payload(Value::String(self.message_text.trim_end().to_owned()))
                         .build();
 
                     self.client.lock().unwrap().write_data(&request).unwrap();
-                    // Fix this trash later
-                    self.message_text = String::new();
+                    
+                    self.message_text.clear();
                 }
             });
         });
@@ -109,11 +111,11 @@ impl eframe::App for App {
 
 fn check_new_messages(
     client: Arc<Mutex<TcpStream>>,
-    messages: Arc<Mutex<Vec<Value>>>,
+    messages: Arc<Mutex<Vec<Message>>>,
 ) -> Result<(), bincode::Error> {
     loop {
         thread::sleep(Duration::from_millis(250));
-        let message = client.lock().unwrap().read_data::<Value>();
+        let message = client.lock().unwrap().read_data::<Message>();
         messages.lock().unwrap().push(match message {
             Ok(message) => message,
             Err(error) => match *error {

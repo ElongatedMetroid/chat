@@ -1,6 +1,6 @@
 use std::net::TcpStream;
 
-use bincode::{Options, DefaultOptions};
+use bincode::{DefaultOptions, Options};
 use serde::{Deserialize, Serialize};
 
 pub trait ChatReader {
@@ -18,8 +18,10 @@ impl ChatReader for TcpStream {
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        Ok(DefaultOptions::new()
+        let data = DefaultOptions::new()
             .with_limit(self.byte_limit())
-            .deserialize_from(self)?)
+            .deserialize_from(self)?;
+
+        Ok(data)
     }
 }
