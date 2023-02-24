@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, fmt};
 
 use lazy_static::lazy_static;
 use rand::seq::SliceRandom;
@@ -16,11 +16,17 @@ lazy_static! {
     };
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
     username: String,
     id: usize,
-    address: SocketAddr,
+    address: Option<SocketAddr>,
+}
+
+impl fmt::Display for User {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.username(), self.id())
+    }
 }
 
 impl User {
@@ -35,13 +41,19 @@ impl User {
             .as_str()
             .unwrap()
     }
+    /// Creates a CLONE of Self with the address field set to None
+    pub fn hide_addr(&self) -> User {
+        let mut new = self.clone();
+        new.address = None;
+        new
+    }
     pub fn username(&self) -> &str {
         &self.username
     }
     pub fn id(&self) -> usize {
         self.id
     }
-    pub fn addr(&self) -> &SocketAddr {
+    pub fn addr(&self) -> &Option<SocketAddr> {
         &self.address
     }
 }
@@ -62,15 +74,15 @@ impl UserBuilder {
         self.id = id;
         self
     }
-    pub fn address(mut self, address: SocketAddr) -> UserBuilder {
-        self.address = Some(address);
+    pub fn address(mut self, address: Option<SocketAddr>) -> UserBuilder {
+        self.address = address;
         self
     }
     pub fn build(self) -> User {
         User {
             username: self.username,
             id: self.id,
-            address: self.address.unwrap(),
+            address: self.address,
         }
     }
 }
