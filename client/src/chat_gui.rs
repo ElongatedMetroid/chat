@@ -1,26 +1,17 @@
 use std::{io, net::TcpStream};
 
 use chat_core::{
-    message::Message,
-    read::ChatReader,
-    request::{Request, Requesting},
-    value::Value,
-    write::ChatWriter,
+    message::Message, read::ChatReader, request::Request, value::Value, write::ChatWriter,
 };
 use egui::{Key, Modifiers, ScrollArea, TextEdit, Window};
 
+#[derive(Default)]
 pub struct ChatGui {
     message_text: String,
     messages: Vec<Message>,
 }
 
 impl ChatGui {
-    pub fn new() -> Self {
-        Self {
-            message_text: String::new(),
-            messages: Vec::new(),
-        }
-    }
     /// This method is really messy, later organize this and make it return a result since it unwraps the value returned
     /// from write_data()
     pub fn update(
@@ -78,12 +69,11 @@ impl ChatGui {
                     && response.has_focus()
                     && !i.modifiers.matches(Modifiers::SHIFT)
             }) {
-                let request = Request::builder()
-                    .requesting(Requesting::SendMessage)
-                    .payload(Value::String(self.message_text.trim_end().to_owned()))
-                    .build();
-
-                client.write_data(&request).unwrap();
+                client
+                    .write_data(&Request::SendMessage(Value::from(
+                        self.message_text.trim_end(),
+                    )))
+                    .unwrap();
 
                 self.message_text.clear();
             }

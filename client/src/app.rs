@@ -17,7 +17,7 @@ impl App {
         client.set_nonblocking(true).unwrap();
 
         Self {
-            chat_ui: ChatGui::new(),
+            chat_ui: ChatGui::default(),
             config_ui: ConfigGui::new().unwrap(),
             client,
         }
