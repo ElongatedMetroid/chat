@@ -18,8 +18,16 @@ use chat_core::{
     user::User,
     value::Value,
 };
+use lazy_static::lazy_static;
 use rayon::ThreadPoolBuilder;
 use server::broadcast::ChatBroadcaster;
+
+lazy_static! {
+    static ref SERVER_USER: User = User::builder()
+        .id(0)
+        .username("SERVER")
+        .build();
+}
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:1234").unwrap_or_else(|e| {
@@ -99,7 +107,7 @@ fn handle_client(
     };
 
     // Create a user
-    let user = {
+    let mut user = {
         // Get peer_address
         let peer_address = clients.lock().unwrap().get(&key).unwrap().peer_addr();
         let peer_address = match peer_address {
@@ -132,17 +140,13 @@ fn handle_client(
 
     println!("New client connected: {user:?}");
 
-    let join_message = Message::builder()
-        .from(
-            User::builder()
-                .username(String::from("SERVER"))
-                .id(0)
-                .build(),
-        )
-        .payload(Value::String(format!("{user} has joined")))
-        .build();
-
-    let result = message_broadcaster.lock().unwrap().send(join_message);
+    let result = message_broadcaster
+        .lock()
+        .unwrap()
+        .send(Message::builder()
+            .from(SERVER_USER.clone())
+            .payload(Value::String(format!("{user} has joined")))
+            .build());
 
     if let Err(error) = result {
         eprintln!("Failed to broadcast join message: {error}");
@@ -202,7 +206,36 @@ fn handle_client(
                     return;
                 }
             }
-            Requesting::ChangeUserName => todo!(),
+            Requesting::ChangeUserName => {
+                let username = match request.payload() {
+                    Some(username) => match username {
+                        Value::String(username) => username,
+                        _ => {
+                            eprintln!("{:?} provided non-string data to change name to.", user.addr());
+                            return;
+                        }
+                    },
+                    None => {
+                        eprintln!("{:?} did not provide payload to change name to.", user.addr());
+                        return;
+                    }
+                };
+
+                let result = message_broadcaster
+                    .lock()
+                    .unwrap()
+                    .send(Message::builder()
+                        .from(SERVER_USER.clone())
+                        .payload(Value::String(format!("Requesting change username. {user} -> {username}")))
+                        .build());
+        
+                if let Err(error) = result {
+                    eprintln!("Failed to broadcast change username message: {error}");
+                    return;
+                }                
+
+                user.set_username(username);
+            },
             Requesting::UserList => todo!(),
         }
     }

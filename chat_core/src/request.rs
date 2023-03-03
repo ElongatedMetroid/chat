@@ -2,13 +2,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::value::Value;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Request {
     requesting: Requesting,
     payload: Option<Value>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub enum Requesting {
     /// Treat the payload as a message
     SendMessage,

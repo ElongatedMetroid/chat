@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{user::User, value::Value};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     from: User,
     // to: Vec<User>,
