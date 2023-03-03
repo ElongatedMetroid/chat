@@ -1,19 +1,25 @@
-use std::{process, io};
+use std::net::TcpStream;
 
 use egui::CentralPanel;
 
-use crate::chat::Chat;
+use crate::{chat_gui::ChatGui, config::gui::ConfigGui};
 
 pub struct App {
-    chat: Chat,
+    // Later maybe add functionality for more chats
+    chat_ui: ChatGui,
+    config_ui: ConfigGui,
+    client: TcpStream,
 }
 
 impl App {
-    pub fn new(
-        _cc: &eframe::CreationContext<'_>,
-    ) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        let client = TcpStream::connect("127.0.0.1:1234").unwrap();
+        client.set_nonblocking(true).unwrap();
+
         Self {
-            chat: Chat::new("127.0.0.1:1234").unwrap()
+            chat_ui: ChatGui::new(),
+            config_ui: ConfigGui::new().unwrap(),
+            client,
         }
     }
 }
@@ -24,37 +30,9 @@ impl eframe::App for App {
         ctx.request_repaint();
 
         CentralPanel::default().show(ctx, |_ui| {
-            if let Err(error) = self.chat.check_new_messages() {
-                match *error {
-                    bincode::ErrorKind::Io(e) if e.kind() == io::ErrorKind::WouldBlock => (),
-                    _ => {
-                        eprintln!("Error checking for new messages: {error}");
-                        process::exit(1);
-                    }
-                }
-            }
-            self.chat.update(&ctx);
-            // if !self.config_handled {
-            //     match config {
+            self.config_ui.update(&ctx, &mut self.client).unwrap();
 
-            //     }
-            //     match self.config.username() {
-            //         // Username is set
-            //         Some(username) => {
-
-            //         },
-            //         // Username is not set, and is not set to be random everytime
-            //         None if !self.config.username().random_username() => {
-
-            //         }
-            //         // Username is set to be random everytime
-            //         None if self.config.username().random_username() => {
-
-            //         }
-            //     }
-            // } else {
-                
-            // }
+            self.chat_ui.update(&ctx, &mut self.client).unwrap();
         });
     }
 }
