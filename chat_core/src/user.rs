@@ -50,6 +50,11 @@ impl User {
     pub fn username(&self) -> &str {
         &self.username
     }
+    pub fn set_username<T>(&mut self, username: T) 
+    where T: Into<String>
+    {
+        self.username = username.into()
+    }
     pub fn id(&self) -> usize {
         self.id
     }
@@ -66,8 +71,10 @@ pub struct UserBuilder {
 }
 
 impl UserBuilder {
-    pub fn username(mut self, username: String) -> UserBuilder {
-        self.username = username;
+    pub fn username<T>(mut self, username: T) -> UserBuilder 
+    where T: Into<String>
+    {
+        self.username = username.into();
         self
     }
     pub fn id(mut self, id: usize) -> UserBuilder {
