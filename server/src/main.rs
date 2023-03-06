@@ -1,12 +1,8 @@
 use std::{
-    collections::HashMap,
     io,
     net::{TcpListener, TcpStream},
     process,
-    sync::{
-        mpsc::{self, Receiver},
-        Arc, Mutex,
-    },
+    sync::{mpsc::Sender, Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -14,7 +10,7 @@ use std::{
 use chat_core::{message::Message, read::ChatReader, request::Request, user::User, value::Value};
 use lazy_static::lazy_static;
 use rayon::ThreadPoolBuilder;
-use server::broadcast::ChatBroadcaster;
+use server::broadcast::{BroadcastMessage, Broadcaster};
 
 lazy_static! {
     static ref SERVER_USER: User = User::builder().id(0).username("SERVER").build();
@@ -32,19 +28,8 @@ fn main() {
             eprintln!("Failed to create threadpool: {e}");
             process::exit(1);
         });
-    let clients = Arc::new(Mutex::new(HashMap::new()));
 
-    // This is used to send messages to a different thread that will handle broadcasting the message
-    let (message_broadcaster, message_reciever) = mpsc::channel();
-
-    // Broadcasting thread
-    thread::spawn({
-        let clients = Arc::clone(&clients);
-
-        move || {
-            broadcast_messages(message_reciever, clients);
-        }
-    });
+    let message_broadcaster = Broadcaster::default().run();
 
     let tx = Arc::new(Mutex::new(message_broadcaster));
 
@@ -53,13 +38,20 @@ fn main() {
         key += 1;
         match stream {
             Ok(stream) => {
-                clients.lock().unwrap().insert(key, stream);
+                let client = Arc::new(Mutex::new(stream));
+
+                {
+                    let client = Arc::clone(&client);
+                    tx.lock()
+                        .unwrap()
+                        .send(BroadcastMessage::NewClient(client, key))
+                        .unwrap();
+                }
 
                 pool.spawn({
-                    let clients = Arc::clone(&clients);
                     let tx = Arc::clone(&tx);
 
-                    move || handle_client(key, clients, tx)
+                    move || handle_client(key, client, tx)
                 });
             }
             Err(e) => {
@@ -71,8 +63,8 @@ fn main() {
 
 fn handle_client(
     key: usize,
-    clients: Arc<Mutex<HashMap<usize, TcpStream>>>,
-    message_broadcaster: Arc<Mutex<mpsc::Sender<Message>>>,
+    client: Arc<Mutex<TcpStream>>,
+    message_broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>,
 ) {
     /// This is strictly used only to make to sure that the
     /// client the corresponds to the key is removed from the
@@ -81,26 +73,33 @@ fn handle_client(
     /// and broadcasting messages would fail everytime.
     /// https://rust-unofficial.github.io/patterns/idioms/dtor-finally.html
     struct Exit {
-        clients: Arc<Mutex<HashMap<usize, TcpStream>>>,
+        message_broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>,
         key: usize,
     }
     impl Drop for Exit {
         fn drop(&mut self) {
-            self.clients.lock().unwrap().remove(&self.key);
+            self.message_broadcaster
+                .lock()
+                .unwrap()
+                .send(BroadcastMessage::RemoveClient(self.key))
+                .unwrap();
             println!("Exiting handle_client()");
         }
     }
 
     let _exit = {
-        let clients = Arc::clone(&clients);
+        let message_broadcaster = Arc::clone(&message_broadcaster);
 
-        Exit { clients, key }
+        Exit {
+            message_broadcaster,
+            key,
+        }
     };
 
     // Create a user
     let mut user = {
         // Get peer_address
-        let peer_address = clients.lock().unwrap().get(&key).unwrap().peer_addr();
+        let peer_address = client.lock().unwrap().peer_addr();
         let peer_address = match peer_address {
             Ok(peer_address) => peer_address,
             Err(error) => {
@@ -117,13 +116,8 @@ fn handle_client(
             .build()
     };
 
-    // Set client to non-blocking
-    let result = clients
-        .lock()
-        .unwrap()
-        .get(&key)
-        .unwrap()
-        .set_nonblocking(true);
+    // Set client to non-blocking, later maybe do this with async
+    let result = client.lock().unwrap().set_nonblocking(true);
     if let Err(error) = result {
         eprintln!("Failed to set non_blocking: {error}");
         return;
@@ -131,39 +125,31 @@ fn handle_client(
 
     println!("New client connected: {user:?}");
 
-    let result = message_broadcaster.lock().unwrap().send(
-        Message::builder()
-            .from(SERVER_USER.clone())
-            .payload(Value::String(format!("{user} has joined")))
-            .build(),
-    );
-
-    if let Err(error) = result {
-        eprintln!("Failed to broadcast join message: {error}");
-        return;
-    }
+    message_broadcaster
+        .lock()
+        .unwrap()
+        .send(BroadcastMessage::ChatMessage(
+            Message::builder()
+                .from(SERVER_USER.clone())
+                .payload(Value::String(format!("{user} has joined")))
+                .build(),
+        ))
+        .unwrap();
 
     loop {
-        thread::sleep(Duration::from_millis(250));
+        thread::sleep(Duration::from_millis(100));
         // Read request
-        let request = clients
-            .lock()
-            .unwrap()
-            .get_mut(&key)
-            .unwrap()
-            .read_data::<Request>();
+        let request = client.lock().unwrap().read_data::<Request>();
 
         let request = match request {
             Ok(request) => request,
             Err(error) => match *error {
+                // No data to be read,
                 bincode::ErrorKind::Io(error) if error.kind() == io::ErrorKind::WouldBlock => {
                     continue
                 }
                 _ => {
-                    eprintln!(
-                        "Dropped/Lost connection to client {:?}: {error}",
-                        user.addr()
-                    );
+                    eprintln!("Bad request from client {:?}: {error}", user.addr());
                     return;
                 }
             },
@@ -177,30 +163,25 @@ fn handle_client(
                     .build();
 
                 // Broadcast message to other clients
-                let result = message_broadcaster.lock().unwrap().send(message);
-
-                if let Err(error) = result {
-                    eprintln!(
-                        "Failed to broadcast message from {:?}: {error}",
-                        user.addr()
-                    );
-                    return;
-                }
+                message_broadcaster
+                    .lock()
+                    .unwrap()
+                    .send(BroadcastMessage::ChatMessage(message))
+                    .unwrap();
             }
             Request::ChangeUserName(username) => {
-                let result = message_broadcaster.lock().unwrap().send(
-                    Message::builder()
-                        .from(SERVER_USER.clone())
-                        .payload(Value::String(format!(
-                            "Requesting change username. {user} -> {username}"
-                        )))
-                        .build(),
-                );
-
-                if let Err(error) = result {
-                    eprintln!("Failed to broadcast change username message: {error}");
-                    return;
-                }
+                message_broadcaster
+                    .lock()
+                    .unwrap()
+                    .send(BroadcastMessage::ChatMessage(
+                        Message::builder()
+                            .from(SERVER_USER.clone())
+                            .payload(Value::String(format!(
+                                "Requesting change username. {user} -> {username}"
+                            )))
+                            .build(),
+                    ))
+                    .unwrap();
 
                 user.set_username::<String>(match username.try_into() {
                     Ok(username) => username,
@@ -212,25 +193,5 @@ fn handle_client(
             }
             Request::UserList => todo!(),
         }
-    }
-}
-
-// create broadcast module with broadcast struct and stuff
-fn broadcast_messages(rx: Receiver<Message>, clients: Arc<Mutex<HashMap<usize, TcpStream>>>) {
-    loop {
-        let message = match rx.recv() {
-            Ok(message) => message,
-            Err(error) => {
-                eprintln!("Recieving message failed: {error}");
-                continue;
-            }
-        };
-
-        let result = clients.lock().unwrap().broadcast(&message);
-
-        if let Err(error) = result {
-            eprintln!("Failed to broadcast message: {error}");
-            continue;
-        };
     }
 }
