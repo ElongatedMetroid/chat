@@ -1,27 +1,25 @@
 use std::{
     collections::HashMap,
-    net::TcpStream,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::mpsc::{self, Receiver, Sender},
     thread,
 };
 
 use chat_core::{message::Message, write::ChatWriter};
 
+use crate::client::Client;
+
 pub enum BroadcastMessage {
     /// Broadcast a message to all connected clients
     ChatMessage(Message),
     /// Add client along with a corresponding key
-    NewClient(Arc<Mutex<TcpStream>>, usize),
+    AddClient(Client, usize),
     /// Remove client with id
     RemoveClient(usize),
 }
 
 #[derive(Default)]
 pub struct Broadcaster {
-    clients: HashMap<usize, Arc<Mutex<TcpStream>>>,
+    clients: HashMap<usize, Client>,
 }
 
 impl Broadcaster {
@@ -36,7 +34,7 @@ impl Broadcaster {
                 BroadcastMessage::ChatMessage(message) => {
                     self.clients.broadcast(&message);
                 }
-                BroadcastMessage::NewClient(client, key) => {
+                BroadcastMessage::AddClient(client, key) => {
                     self.clients.insert(key, client);
                 }
                 BroadcastMessage::RemoveClient(key) => {
@@ -54,12 +52,12 @@ pub trait Broadcast {
     fn broadcast(&mut self, message: &Message);
 }
 
-impl Broadcast for HashMap<usize, Arc<Mutex<TcpStream>>> {
+impl Broadcast for HashMap<usize, Client> {
     /// Broadcast a `Message` to all clients, if writing data to a client fails, the message will not be broadcasted to that
     /// client (the client is not removed).
     fn broadcast(&mut self, message: &Message) {
         for client in self.values() {
-            let _ = client.lock().unwrap().write_data(message);
+            let _ = client.stream.lock().unwrap().write_data(message);
         }
     }
 }
