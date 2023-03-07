@@ -17,6 +17,9 @@ pub enum BroadcastMessage {
     RemoveClient(usize),
 }
 
+/// Recieves messages through the Sender<BroadcastMessage>
+/// returned from Broadcaster::run(). Handles stuff involving all
+/// clients such as, broadcasting messages to all clients.
 #[derive(Default)]
 pub struct Broadcaster {
     clients: HashMap<usize, Client>,

@@ -61,6 +61,12 @@ impl Client {
             }
         };
 
+        broadcaster
+            .lock()
+            .unwrap()
+            .send(BroadcastMessage::AddClient(self.clone(), self.key()))
+            .unwrap();
+
         // Create a user
         let mut user = {
             // Get peer_address

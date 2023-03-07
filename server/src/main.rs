@@ -6,7 +6,7 @@ use std::{
 
 use rayon::ThreadPoolBuilder;
 use server::{
-    broadcast::{BroadcastMessage, Broadcaster},
+    broadcast::Broadcaster,
     client::Client,
 };
 
@@ -25,9 +25,9 @@ fn main() {
             process::exit(1);
         });
 
-    let message_broadcaster = Broadcaster::default().run();
-
-    let tx = Arc::new(Mutex::new(message_broadcaster));
+    // Start the message broadcaster on a seperate thread, the sender needs to be inside an Arc<Mutex<T>> since it will be shared between
+    // all client threads.
+    let message_broadcaster = Arc::new(Mutex::new(Broadcaster::default().run()));
 
     let mut key = 0;
     for stream in listener.incoming() {
@@ -36,18 +36,9 @@ fn main() {
             Ok(stream) => {
                 let client = Client::new(key, Arc::new(Mutex::new(stream)));
 
-                {
-                    let client = client.clone();
-                    tx.lock()
-                        .unwrap()
-                        .send(BroadcastMessage::AddClient(client, key))
-                        .unwrap();
-                }
-
                 pool.spawn({
-                    let tx = Arc::clone(&tx);
-
-                    move || client.run(tx)
+                    let message_broadcaster = Arc::clone(&message_broadcaster);
+                    move || client.run(message_broadcaster)
                 });
             }
             Err(e) => {
