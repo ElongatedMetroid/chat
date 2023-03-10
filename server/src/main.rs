@@ -1,14 +1,12 @@
 use std::{
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
     process,
     sync::{Arc, Mutex},
 };
 
+use chat_core::client_streams::ClientStreams;
 use rayon::ThreadPoolBuilder;
-use server::{
-    broadcast::Broadcaster,
-    client::Client,
-};
+use server::{broadcast::Broadcaster, client::Client};
 
 fn main() {
     // TODO move most of the code in main to a seperate client listener module
@@ -33,8 +31,31 @@ fn main() {
     for stream in listener.incoming() {
         key += 1;
         match stream {
-            Ok(stream) => {
-                let client = Client::new(key, Arc::new(Mutex::new(stream)));
+            Ok(write_stream) => {
+                let mut read_port = match write_stream.peer_addr() {
+                    Ok(port) => port,
+                    Err(error) => {
+                        eprintln!("Failed to get peer_addr!: {error}");
+                        return;
+                    },
+                };
+                read_port.set_port(4321);
+                let read_stream = match TcpStream::connect(read_port) {
+                    Ok(stream) => stream,
+                    Err(error) => {
+                        eprintln!("Error connecting to server read stream (client write): {error}");
+                        return;
+                    },
+                };
+
+                let client_streams = ClientStreams::Server(
+                    Arc::new(Mutex::new(read_stream)),
+                    Arc::new(Mutex::new(write_stream)),
+                );
+
+                eprintln!("Estabilished Connection: {client_streams:#?}");
+
+                let mut client = Client::new(key, client_streams);
 
                 pool.spawn({
                     let message_broadcaster = Arc::clone(&message_broadcaster);

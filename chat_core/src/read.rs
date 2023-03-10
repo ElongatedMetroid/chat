@@ -7,7 +7,7 @@ pub trait ChatReader {
     fn read_data<T>(&mut self) -> Result<T, bincode::Error>
     where
         T: Serialize + for<'a> Deserialize<'a>;
-    fn byte_limit(&self) -> u64 {
+    fn byte_limit() -> u64 {
         4000
     }
 }
@@ -19,7 +19,7 @@ impl ChatReader for TcpStream {
         T: Serialize + for<'a> Deserialize<'a>,
     {
         let data = DefaultOptions::new()
-            .with_limit(self.byte_limit())
+            .with_limit(Self::byte_limit())
             .deserialize_from(self)?;
 
         Ok(data)

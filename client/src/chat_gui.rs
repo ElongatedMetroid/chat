@@ -1,7 +1,6 @@
-use std::{io, net::TcpStream};
-
+use std::io;
 use chat_core::{
-    message::Message, read::ChatReader, request::Request, value::Value, write::ChatWriter,
+    message::Message, read::ChatReader, request::Request, value::Value, write::ChatWriter, client_streams::ClientStreams,
 };
 use egui::{Key, Modifiers, ScrollArea, TextEdit, Window};
 
@@ -17,10 +16,10 @@ impl ChatGui {
     pub fn update(
         &mut self,
         ctx: &egui::Context,
-        client: &mut TcpStream,
+        client_streams: &mut ClientStreams,
     ) -> Result<(), bincode::Error> {
         // Check if there is a new message
-        let message: Option<Message> = match client.read_data::<Message>() {
+        let message: Option<Message> = match client_streams.read_data::<Message>() {
             Ok(message) => Some(message),
             Err(error) => match *error {
                 bincode::ErrorKind::Io(error) if error.kind() == io::ErrorKind::WouldBlock => None,
@@ -47,7 +46,7 @@ impl ChatGui {
 
             ui.separator();
 
-            if self.message_text.bytes().len() as u64 > ChatWriter::byte_limit(client) {
+            if self.message_text.bytes().len() as u64 > <ClientStreams as ChatWriter>::byte_limit() {
                 ui.label("Message Too Long!");
                 ui.separator();
             }
@@ -69,7 +68,7 @@ impl ChatGui {
                     && response.has_focus()
                     && !i.modifiers.matches(Modifiers::SHIFT)
             }) {
-                client
+                client_streams
                     .write_data(&Request::SendMessage(Value::from(
                         self.message_text.trim_end(),
                     )))

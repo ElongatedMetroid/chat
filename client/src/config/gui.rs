@@ -1,5 +1,5 @@
-use chat_core::{request::Request, value::Value, write::ChatWriter};
-use std::{io, net::TcpStream};
+use chat_core::{request::Request, value::Value, write::ChatWriter, client_streams::ClientStreams};
+use std::io;
 
 use super::{Config, ConfigError};
 
@@ -27,7 +27,7 @@ impl ConfigGui {
     pub fn update(
         &mut self,
         ctx: &egui::Context,
-        client: &mut TcpStream,
+        client_streams: &mut ClientStreams,
     ) -> Result<(), bincode::Error> {
         // if the config has not been handled
         if !self.config_handled {
@@ -46,7 +46,7 @@ impl ConfigGui {
             };
 
             if let Some(request) = request {
-                client.write_data(&request)?;
+                client_streams.write_data(&request)?;
             }
 
             self.config_handled = true;

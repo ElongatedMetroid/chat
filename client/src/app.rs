@@ -1,5 +1,6 @@
-use std::net::TcpStream;
+use std::{net::{TcpStream, TcpListener}, sync::{Mutex, Arc}};
 
+use chat_core::client_streams::ClientStreams;
 use egui::CentralPanel;
 
 use crate::{chat_gui::ChatGui, config::gui::ConfigGui};
@@ -8,18 +9,28 @@ pub struct App {
     // Later maybe add functionality for more chats
     chat_ui: ChatGui,
     config_ui: ConfigGui,
-    client: TcpStream,
+    client_streams: ClientStreams,
 }
 
 impl App {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        let client = TcpStream::connect("127.0.0.1:1234").unwrap();
-        client.set_nonblocking(true).unwrap();
+        let read = TcpStream::connect("127.0.0.1:1234").unwrap();
+
+        read.set_nonblocking(true).unwrap();
+
+        let mut write_port = read.local_addr().unwrap();
+        write_port.set_port(4321);
+
+        let write = TcpListener::bind(write_port).unwrap().accept().unwrap().0;
+
+        let client_streams = ClientStreams::Client(Arc::new(Mutex::new(read)), Arc::new(Mutex::new(write)));
+
+        eprintln!("Estabilished Connection: {client_streams:#?}");
 
         Self {
             chat_ui: ChatGui::default(),
             config_ui: ConfigGui::new().unwrap(),
-            client,
+            client_streams,
         }
     }
 }
@@ -30,9 +41,9 @@ impl eframe::App for App {
         ctx.request_repaint();
 
         CentralPanel::default().show(ctx, |_ui| {
-            self.config_ui.update(&ctx, &mut self.client).unwrap();
+            self.config_ui.update(&ctx, &mut self.client_streams).unwrap();
 
-            self.chat_ui.update(&ctx, &mut self.client).unwrap();
+            self.chat_ui.update(&ctx, &mut self.client_streams).unwrap();
         });
     }
 }

@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, fmt};
+use std::{fmt, net::SocketAddr};
 
 use lazy_static::lazy_static;
 use rand::seq::SliceRandom;
@@ -20,7 +20,7 @@ lazy_static! {
 pub struct User {
     username: String,
     id: usize,
-    address: Option<SocketAddr>,
+    addresses: Option<(SocketAddr, SocketAddr)>,
 }
 
 impl fmt::Display for User {
@@ -44,22 +44,23 @@ impl User {
     /// Creates a CLONE of Self with the address field set to None
     pub fn hide_addr(&self) -> User {
         let mut new = self.clone();
-        new.address = None;
+        new.addresses = None;
         new
     }
     pub fn username(&self) -> &str {
         &self.username
     }
-    pub fn set_username<T>(&mut self, username: T) 
-    where T: Into<String>
+    pub fn set_username<T>(&mut self, username: T)
+    where
+        T: Into<String>,
     {
         self.username = username.into()
     }
     pub fn id(&self) -> usize {
         self.id
     }
-    pub fn addr(&self) -> &Option<SocketAddr> {
-        &self.address
+    pub fn addrs(&self) -> &Option<(SocketAddr, SocketAddr)> {
+        &self.addresses
     }
 }
 
@@ -67,12 +68,13 @@ impl User {
 pub struct UserBuilder {
     username: String,
     id: usize,
-    address: Option<SocketAddr>,
+    addresses: Option<(SocketAddr, SocketAddr)>,
 }
 
 impl UserBuilder {
-    pub fn username<T>(mut self, username: T) -> UserBuilder 
-    where T: Into<String>
+    pub fn username<T>(mut self, username: T) -> UserBuilder
+    where
+        T: Into<String>,
     {
         self.username = username.into();
         self
@@ -81,15 +83,15 @@ impl UserBuilder {
         self.id = id;
         self
     }
-    pub fn address(mut self, address: Option<SocketAddr>) -> UserBuilder {
-        self.address = address;
+    pub fn addresses(mut self, addresses: Option<(SocketAddr, SocketAddr)>) -> UserBuilder {
+        self.addresses = addresses;
         self
     }
     pub fn build(self) -> User {
         User {
             username: self.username,
             id: self.id,
-            address: self.address,
+            addresses: self.addresses,
         }
     }
 }

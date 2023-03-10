@@ -1,12 +1,12 @@
 use std::{
     io,
-    net::TcpStream,
     sync::{mpsc::Sender, Arc, Mutex},
-    thread,
-    time::Duration,
 };
 
-use chat_core::{message::Message, read::ChatReader, request::Request, user::User, value::Value};
+use chat_core::{
+    client_streams::ClientStreams, message::Message, read::ChatReader, request::Request,
+    user::User, value::Value,
+};
 
 use crate::broadcast::BroadcastMessage;
 
@@ -16,20 +16,19 @@ lazy_static! {
     static ref SERVER_USER: User = User::builder().id(0).username("SERVER").build();
 }
 
-#[derive(Clone)]
 pub struct Client {
     pub key: usize,
-    pub stream: Arc<Mutex<TcpStream>>,
+    pub streams: ClientStreams,
 }
 
 impl Client {
-    pub fn new(key: usize, stream: Arc<Mutex<TcpStream>>) -> Self {
-        Self { key, stream }
+    pub fn new(key: usize, streams: ClientStreams) -> Self {
+        Self { key, streams }
     }
     pub fn key(&self) -> usize {
         self.key
     }
-    pub fn run(&self, broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>) {
+    pub fn run(&mut self, broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>) {
         /// This is strictly used only to make to sure that the
         /// client the corresponds to the key is removed from the
         /// HashMap on exiting this function. This is important
@@ -64,17 +63,20 @@ impl Client {
         broadcaster
             .lock()
             .unwrap()
-            .send(BroadcastMessage::AddClient(self.clone(), self.key()))
+            .send(BroadcastMessage::AddClient(
+                self.streams.clone(),
+                self.key(),
+            ))
             .unwrap();
 
         // Create a user
         let mut user = {
-            // Get peer_address
-            let peer_address = self.stream.lock().unwrap().peer_addr();
-            let peer_address = match peer_address {
-                Ok(peer_address) => peer_address,
-                Err(error) => {
-                    eprintln!("Failed to get peer_address: {error}");
+            // Get peer_addresses
+            let peer_addresses = self.streams.peer_addrs();
+            let peer_addresses = match peer_addresses {
+                (Ok(read), Ok(write)) => (read, write),
+                _ => {
+                    eprintln!("Could not get peer_addresses!");
                     return;
                 }
             };
@@ -83,16 +85,9 @@ impl Client {
             User::builder()
                 .username(format!("anonymous-{}", User::random_name()))
                 .id(self.key)
-                .address(Some(peer_address))
+                .addresses(Some(peer_addresses))
                 .build()
         };
-
-        // Set client to non-blocking, later maybe do this with async
-        let result = self.stream.lock().unwrap().set_nonblocking(true);
-        if let Err(error) = result {
-            eprintln!("Failed to set non_blocking: {error}");
-            return;
-        }
 
         println!("New client connected: {user:?}");
 
@@ -108,9 +103,8 @@ impl Client {
             .unwrap();
 
         loop {
-            thread::sleep(Duration::from_millis(100));
             // Read request
-            let request = self.stream.lock().unwrap().read_data::<Request>();
+            let request = self.streams.read_data::<Request>();
 
             let request = match request {
                 Ok(request) => request,
@@ -120,7 +114,7 @@ impl Client {
                         continue
                     }
                     _ => {
-                        eprintln!("Bad request from client {:?}: {error}", user.addr());
+                        eprintln!("Bad request from client {:?}: {error}", user.addrs());
                         return;
                     }
                 },

@@ -4,15 +4,13 @@ use std::{
     thread,
 };
 
-use chat_core::{message::Message, write::ChatWriter};
-
-use crate::client::Client;
+use chat_core::{client_streams::ClientStreams, message::Message, write::ChatWriter};
 
 pub enum BroadcastMessage {
     /// Broadcast a message to all connected clients
     ChatMessage(Message),
     /// Add client along with a corresponding key
-    AddClient(Client, usize),
+    AddClient(ClientStreams, usize),
     /// Remove client with id
     RemoveClient(usize),
 }
@@ -22,7 +20,7 @@ pub enum BroadcastMessage {
 /// clients such as, broadcasting messages to all clients.
 #[derive(Default)]
 pub struct Broadcaster {
-    clients: HashMap<usize, Client>,
+    clients: HashMap<usize, ClientStreams>,
 }
 
 impl Broadcaster {
@@ -55,12 +53,12 @@ pub trait Broadcast {
     fn broadcast(&mut self, message: &Message);
 }
 
-impl Broadcast for HashMap<usize, Client> {
+impl Broadcast for HashMap<usize, ClientStreams> {
     /// Broadcast a `Message` to all clients, if writing data to a client fails, the message will not be broadcasted to that
     /// client (the client is not removed).
     fn broadcast(&mut self, message: &Message) {
-        for client in self.values() {
-            let _ = client.stream.lock().unwrap().write_data(message);
+        for client in self.values_mut() {
+            let _ = client.write_data(message);
         }
     }
 }

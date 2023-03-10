@@ -1,4 +1,7 @@
-use std::{fmt::{self, Display}, error::Error};
+use std::{
+    error::Error,
+    fmt::{self, Display},
+};
 
 use serde::{Deserialize, Serialize};
 

@@ -7,7 +7,7 @@ pub trait ChatWriter {
     fn write_data<T>(&mut self, data: &T) -> Result<(), bincode::Error>
     where
         T: Serialize + for<'a> Deserialize<'a>;
-    fn byte_limit(&self) -> u64 {
+    fn byte_limit() -> u64 {
         4000
     }
 }
@@ -19,7 +19,7 @@ impl ChatWriter for TcpStream {
         T: Serialize + for<'a> Deserialize<'a>,
     {
         DefaultOptions::new()
-            .with_limit(self.byte_limit())
+            .with_limit(Self::byte_limit())
             .serialize_into(self, &data)?;
 
         Ok(())
