@@ -30,7 +30,7 @@ impl App {
 
         Self {
             chat_ui: ChatGui::new(client_streams.clone()),
-            config_ui: ConfigGui::new(client_streams.clone()).unwrap(),
+            config_ui: ConfigGui::new(client_streams).unwrap(),
         }
     }
 }

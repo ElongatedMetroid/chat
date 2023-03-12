@@ -44,7 +44,9 @@ impl ChatReader for ClientStreams {
         let read = &*match self {
             ClientStreams::Client(read, _) => read,
             ClientStreams::Server(read, _) => read,
-        }.lock().unwrap();
+        }
+        .lock()
+        .unwrap();
 
         let data = DefaultOptions::new()
             .with_limit(<Self as ChatReader>::byte_limit())
@@ -63,7 +65,9 @@ impl ChatWriter for ClientStreams {
         let write = &*match self {
             ClientStreams::Client(_, write) => write,
             ClientStreams::Server(_, write) => write,
-        }.lock().unwrap();
+        }
+        .lock()
+        .unwrap();
 
         DefaultOptions::new()
             .with_limit(<Self as ChatWriter>::byte_limit())
