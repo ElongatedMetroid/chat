@@ -1,36 +1,51 @@
-use std::io;
 use chat_core::{
-    message::Message, read::ChatReader, request::Request, value::Value, write::ChatWriter, client_streams::ClientStreams,
+    client_streams::ClientStreams, message::Message, read::ChatReader, request::Request,
+    value::Value, write::ChatWriter,
 };
 use egui::{Key, Modifiers, ScrollArea, TextEdit, Window};
+use std::{
+    process,
+    sync::{Arc, Mutex},
+    thread,
+};
 
-#[derive(Default)]
 pub struct ChatGui {
+    client_streams: ClientStreams,
     message_text: String,
-    messages: Vec<Message>,
+    messages: Arc<Mutex<Vec<Message>>>,
 }
 
 impl ChatGui {
-    /// This method is really messy, later organize this and make it return a result since it unwraps the value returned
-    /// from write_data()
-    pub fn update(
-        &mut self,
-        ctx: &egui::Context,
-        client_streams: &mut ClientStreams,
-    ) -> Result<(), bincode::Error> {
-        // Check if there is a new message
-        let message: Option<Message> = match client_streams.read_data::<Message>() {
-            Ok(message) => Some(message),
-            Err(error) => match *error {
-                bincode::ErrorKind::Io(error) if error.kind() == io::ErrorKind::WouldBlock => None,
-                _ => return Err(error),
-            },
+    /// Create a new ChatGui, and start message checking thread
+    pub fn new(client_streams: ClientStreams) -> Self {
+        let chat_gui = Self {
+            client_streams: client_streams,
+            message_text: String::new(),
+            messages: Arc::new(Mutex::new(Vec::new())),
         };
-        // If there was a new message push it to our messages
-        if let Some(message) = message {
-            self.messages.push(message);
-        }
 
+        chat_gui.start();
+
+        chat_gui
+    }
+    /// Start a new thread that will check for new messages, and start a thread that will check for responses
+    fn start(&self) {
+        thread::spawn({
+            let mut client_streams = self.client_streams.clone();
+            let messages = self.messages.clone();
+            move || loop {
+                match client_streams.read_data::<Message>() {
+                    Ok(message) => messages.lock().unwrap().push(message),
+                    Err(error) => {
+                        eprintln!("Error reading new message: {error}");
+                        process::exit(1);
+                    }
+                }
+            }
+        });
+    }
+    /// Update gui
+    pub fn update(&mut self, ctx: &egui::Context) -> Result<(), bincode::Error> {
         Window::new("chat1").show(ctx, |ui| {
             // Messages scroll area
             ScrollArea::vertical()
@@ -39,14 +54,15 @@ impl ChatGui {
                 .max_height(ui.available_height() / 1.5)
                 .max_width(f32::INFINITY)
                 .show(ui, |ui| {
-                    for message in &self.messages {
+                    for message in &*self.messages.lock().unwrap() {
                         ui.label(format!("{message}"));
                     }
                 });
 
             ui.separator();
 
-            if self.message_text.bytes().len() as u64 > <ClientStreams as ChatWriter>::byte_limit() {
+            if self.message_text.bytes().len() as u64 > <ClientStreams as ChatWriter>::byte_limit()
+            {
                 ui.label("Message Too Long!");
                 ui.separator();
             }
@@ -68,7 +84,7 @@ impl ChatGui {
                     && response.has_focus()
                     && !i.modifiers.matches(Modifiers::SHIFT)
             }) {
-                client_streams
+                self.client_streams
                     .write_data(&Request::SendMessage(Value::from(
                         self.message_text.trim_end(),
                     )))

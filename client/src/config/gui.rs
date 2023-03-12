@@ -1,4 +1,4 @@
-use chat_core::{request::Request, value::Value, write::ChatWriter, client_streams::ClientStreams};
+use chat_core::{client_streams::ClientStreams, request::Request, value::Value, write::ChatWriter};
 use std::io;
 
 use super::{Config, ConfigError};
@@ -6,10 +6,11 @@ use super::{Config, ConfigError};
 pub struct ConfigGui {
     config: Option<Config>,
     config_handled: bool,
+    client_streams: ClientStreams,
 }
 
 impl ConfigGui {
-    pub fn new() -> Result<Self, ConfigError> {
+    pub fn new(client_streams: ClientStreams) -> Result<Self, ConfigError> {
         let config = ConfigGui {
             config: match Config::load() {
                 Ok(config) => Some(config),
@@ -19,16 +20,13 @@ impl ConfigGui {
                 },
             },
             config_handled: false,
+            client_streams,
         };
 
         Ok(config)
     }
     /// This function will handle checking if the config has already been checked, so no need to wrap it in a check
-    pub fn update(
-        &mut self,
-        ctx: &egui::Context,
-        client_streams: &mut ClientStreams,
-    ) -> Result<(), bincode::Error> {
+    pub fn update(&mut self, ctx: &egui::Context) -> Result<(), bincode::Error> {
         // if the config has not been handled
         if !self.config_handled {
             let request = match &self.config {
@@ -46,7 +44,7 @@ impl ConfigGui {
             };
 
             if let Some(request) = request {
-                client_streams.write_data(&request)?;
+                self.client_streams.write_data(&request)?;
             }
 
             self.config_handled = true;
