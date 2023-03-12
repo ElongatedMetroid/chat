@@ -1,7 +1,4 @@
-use std::{
-    io,
-    sync::{mpsc::Sender, Arc, Mutex},
-};
+use std::sync::{mpsc::Sender, Arc, Mutex};
 
 use chat_core::{
     client_streams::ClientStreams, message::Message, read::ChatReader, request::Request,
@@ -103,21 +100,15 @@ impl Client {
             .unwrap();
 
         loop {
-            // Read request
+            // Read request (Blocks thread until there is something to read)
             let request = self.streams.read_data::<Request>();
 
             let request = match request {
                 Ok(request) => request,
-                Err(error) => match *error {
-                    // No data to be read,
-                    bincode::ErrorKind::Io(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                        continue
-                    }
-                    _ => {
-                        eprintln!("Bad request from client {:?}: {error}", user.addrs());
-                        return;
-                    }
-                },
+                Err(error) => {
+                    eprintln!("Bad request: {error}");
+                    return;
+                }
             };
 
             match request {

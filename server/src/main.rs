@@ -32,22 +32,24 @@ fn main() {
         key += 1;
         match stream {
             Ok(write_stream) => {
+                // Get the address of the stream that connected
                 let mut read_port = match write_stream.peer_addr() {
                     Ok(port) => port,
                     Err(error) => {
                         eprintln!("Failed to get peer_addr!: {error}");
                         return;
-                    },
+                    }
                 };
+                // Set the port to the reading port (the client has opened this port, and is waiting for a connection on it)
                 read_port.set_port(4321);
                 let read_stream = match TcpStream::connect(read_port) {
                     Ok(stream) => stream,
                     Err(error) => {
                         eprintln!("Error connecting to server read stream (client write): {error}");
                         return;
-                    },
+                    }
                 };
-
+                // Create a new ClientStreams enum with the Server variant
                 let client_streams = ClientStreams::Server(
                     Arc::new(Mutex::new(read_stream)),
                     Arc::new(Mutex::new(write_stream)),
