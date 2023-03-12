@@ -1,6 +1,6 @@
 use chat_core::{
     client_streams::ClientStreams, message::Message, read::ChatReader, request::Request,
-    value::Value, write::ChatWriter,
+    response::Response, value::Value, write::ChatWriter,
 };
 use egui::{Key, Modifiers, ScrollArea, TextEdit, Window};
 use std::{
@@ -19,7 +19,7 @@ impl ChatGui {
     /// Create a new ChatGui, and start message checking thread
     pub fn new(client_streams: ClientStreams) -> Self {
         let chat_gui = Self {
-            client_streams: client_streams,
+            client_streams,
             message_text: String::new(),
             messages: Arc::new(Mutex::new(Vec::new())),
         };
@@ -34,8 +34,14 @@ impl ChatGui {
             let mut client_streams = self.client_streams.clone();
             let messages = self.messages.clone();
             move || loop {
-                match client_streams.read_data::<Message>() {
-                    Ok(message) => messages.lock().unwrap().push(message),
+                match client_streams.read_data::<Response>() {
+                    Ok(response) => match response {
+                        Response::Message(message) => messages.lock().unwrap().push(message),
+                        Response::Error(error) => {
+                            eprintln!("Server returned error: {error}");
+                            process::exit(1);
+                        }
+                    },
                     Err(error) => {
                         eprintln!("Error reading new message: {error}");
                         process::exit(1);

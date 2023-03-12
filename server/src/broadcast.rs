@@ -4,7 +4,9 @@ use std::{
     thread,
 };
 
-use chat_core::{client_streams::ClientStreams, message::Message, write::ChatWriter};
+use chat_core::{
+    client_streams::ClientStreams, message::Message, response::Response, write::ChatWriter,
+};
 
 pub enum BroadcastMessage {
     /// Broadcast a message to all connected clients
@@ -33,7 +35,7 @@ impl Broadcaster {
 
             match message {
                 BroadcastMessage::ChatMessage(message) => {
-                    self.clients.broadcast(&message);
+                    self.clients.broadcast(message);
                 }
                 BroadcastMessage::AddClient(client, key) => {
                     self.clients.insert(key, client);
@@ -50,15 +52,17 @@ impl Broadcaster {
 
 pub trait Broadcast {
     /// Broadcast a `Message` to all clients, cannot error (error should be handled inside)
-    fn broadcast(&mut self, message: &Message);
+    fn broadcast(&mut self, message: Message);
 }
 
 impl Broadcast for HashMap<usize, ClientStreams> {
     /// Broadcast a `Message` to all clients, if writing data to a client fails, the message will not be broadcasted to that
     /// client (the client is not removed).
-    fn broadcast(&mut self, message: &Message) {
+    fn broadcast(&mut self, message: Message) {
+        let response = Response::Message(message);
+
         for client in self.values_mut() {
-            let _ = client.write_data(message);
+            let _ = client.write_data(&response);
         }
     }
 }

@@ -2,7 +2,7 @@ use std::sync::{mpsc::Sender, Arc, Mutex};
 
 use chat_core::{
     client_streams::ClientStreams, message::Message, read::ChatReader, request::Request,
-    user::User, value::Value,
+    response::Response, user::User, value::Value, write::ChatWriter,
 };
 
 use crate::broadcast::BroadcastMessage;
@@ -73,7 +73,11 @@ impl Client {
             let peer_addresses = match peer_addresses {
                 (Ok(read), Ok(write)) => (read, write),
                 _ => {
-                    eprintln!("Could not get peer_addresses!");
+                    self.streams
+                        .write_data(&Response::Error(
+                            "Could not get your ip-addresses!".to_owned(),
+                        ))
+                        .ok();
                     return;
                 }
             };
@@ -106,7 +110,9 @@ impl Client {
             let request = match request {
                 Ok(request) => request,
                 Err(error) => {
-                    eprintln!("Bad request: {error}");
+                    self.streams
+                        .write_data(&Response::Error(format!("Bad request: {error}")))
+                        .ok();
                     return;
                 }
             };
@@ -142,7 +148,11 @@ impl Client {
                     user.set_username::<String>(match username.try_into() {
                         Ok(username) => username,
                         Err(error) => {
-                            eprintln!("Cannot change username to non-string data: {error}");
+                            self.streams
+                                .write_data(&format!(
+                                    "Cannot change username to non-string data: {error}"
+                                ))
+                                .ok();
                             return;
                         }
                     });

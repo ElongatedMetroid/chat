@@ -55,7 +55,7 @@ fn main() {
                     Arc::new(Mutex::new(write_stream)),
                 );
 
-                eprintln!("Estabilished Connection: {client_streams:#?}");
+                eprintln!("Estabilished Connection: {client_streams:?}");
 
                 let mut client = Client::new(key, client_streams);
 
