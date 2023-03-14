@@ -3,6 +3,6 @@ Tcp chat made in Rust with a GUI
 
 ## TODO
 Clean up connection code, and in general clean up client_streams module
+Create guidelines for messages and username (data that is sent in general)
 Add client listener module
-Add proper response system
 Clean up all code
