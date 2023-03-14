@@ -6,12 +6,12 @@ use std::{
 use chat_core::client_streams::ClientStreams;
 use egui::CentralPanel;
 
-use crate::{chat_gui::ChatGui, config::gui::ConfigGui};
+use crate::{chat::Chat, config::gui::ConfigGui};
 
 pub struct App {
     // Later maybe add functionality for more chats
-    chat_ui: ChatGui,
-    config_ui: ConfigGui,
+    chat: Chat,
+    config: ConfigGui,
 }
 
 impl App {
@@ -29,8 +29,8 @@ impl App {
         eprintln!("Estabilished Connection: {client_streams:#?}");
 
         Self {
-            chat_ui: ChatGui::new(client_streams.clone()),
-            config_ui: ConfigGui::new(client_streams).unwrap(),
+            chat: Chat::new(client_streams.clone()),
+            config: ConfigGui::new(client_streams).unwrap(),
         }
     }
 }
@@ -41,9 +41,9 @@ impl eframe::App for App {
         ctx.request_repaint();
 
         CentralPanel::default().show(ctx, |_ui| {
-            self.config_ui.update(&ctx).unwrap();
+            self.config.update_gui(&ctx).unwrap();
 
-            self.chat_ui.update(&ctx).unwrap();
+            self.chat.update_gui(&ctx).unwrap();
         });
     }
 }

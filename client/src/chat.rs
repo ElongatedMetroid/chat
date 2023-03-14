@@ -9,13 +9,13 @@ use std::{
     thread,
 };
 
-pub struct ChatGui {
+pub struct Chat {
     client_streams: ClientStreams,
     message_text: String,
     messages: Arc<Mutex<Vec<Message>>>,
 }
 
-impl ChatGui {
+impl Chat {
     /// Create a new ChatGui, and start message checking thread
     pub fn new(client_streams: ClientStreams) -> Self {
         let chat_gui = Self {
@@ -51,8 +51,8 @@ impl ChatGui {
         });
     }
     /// Update gui
-    pub fn update(&mut self, ctx: &egui::Context) -> Result<(), bincode::Error> {
-        Window::new("chat1").show(ctx, |ui| {
+    pub fn update_gui(&mut self, ctx: &egui::Context) -> Result<(), bincode::Error> {
+        Window::new("Chat").show(ctx, |ui| {
             // Messages scroll area
             ScrollArea::vertical()
                 .id_source("messages")
