@@ -41,9 +41,9 @@ impl eframe::App for App {
         ctx.request_repaint();
 
         CentralPanel::default().show(ctx, |_ui| {
-            self.config.update_gui(&ctx).unwrap();
+            self.config.update_gui(ctx).unwrap();
 
-            self.chat.update_gui(&ctx).unwrap();
+            self.chat.update_gui(ctx).unwrap();
         });
     }
 }
