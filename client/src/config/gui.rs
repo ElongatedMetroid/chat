@@ -1,11 +1,17 @@
-use chat_core::{client_streams::ClientStreams, request::Request, value::Value, write::ChatWriter};
+use chat_core::{
+    client_streams::ClientStreams,
+    config::{Config, ConfigError},
+    request::Request,
+    value::Value,
+    write::ChatWriter,
+};
 use egui::Window;
 use std::{io, process};
 
-use super::{Config, ConfigError};
+use super::ClientConfig;
 
 pub struct ConfigGui {
-    config: Option<Config>,
+    config: Option<ClientConfig>,
     config_handled: bool,
     client_streams: ClientStreams,
 
@@ -15,7 +21,7 @@ pub struct ConfigGui {
 pub struct CreateConfigData {
     random_username: bool,
     username: Option<String>,
-    config: Option<Config>,
+    config: Option<ClientConfig>,
 }
 
 impl ConfigGui {
@@ -24,7 +30,7 @@ impl ConfigGui {
     /// error will be returned if something other than `io::ErrorKind::NotFound` is returned from Config::load().
     pub fn new(client_streams: ClientStreams) -> Result<Self, ConfigError> {
         let config = ConfigGui {
-            config: match Config::load() {
+            config: match ClientConfig::load() {
                 Ok(config) => Some(config),
                 Err(error) => match error {
                     ConfigError::IoError(error) if error.kind() == io::ErrorKind::NotFound => None,
@@ -63,7 +69,9 @@ impl ConfigGui {
                         ui.vertical(|ui| {
                             // If the random username checkbox is not checked, show a text box for a username
                             if !self.create_config_data.random_username {
-                                ui.text_edit_singleline(self.create_config_data.username.as_mut().unwrap());
+                                ui.text_edit_singleline(
+                                    self.create_config_data.username.as_mut().unwrap(),
+                                );
                             }
                             ui.checkbox(
                                 &mut self.create_config_data.random_username,
@@ -77,15 +85,22 @@ impl ConfigGui {
                             if ui.button("Do this Later").clicked() {
                                 self.config_handled = true;
                             }
-    
+
                             if ui.button("Done").clicked() {
-                                self.create_config_data.config =
-                                    Some(Config::new(if self.create_config_data.random_username {
+                                self.create_config_data.config = Some(ClientConfig::default());
+                                // Set the username, if the random_username button was checked set it to none, otherwise
+                                // set it to the contents of the username text box.
+                                self.create_config_data
+                                    .config
+                                    .as_mut()
+                                    .unwrap()
+                                    .username
+                                    .set_name(if self.create_config_data.random_username {
                                         None
                                     } else {
                                         Some(self.create_config_data.username.take().unwrap())
-                                    }));
-    
+                                    });
+
                                 if let Err(error) =
                                     self.create_config_data.config.as_ref().unwrap().write()
                                 {
