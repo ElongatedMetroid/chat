@@ -11,39 +11,44 @@ use crate::{broadcast::Broadcaster, client::Client, config::ServerConfig};
 pub struct ClientListener {
     pool: ThreadPool,
     listener: TcpListener,
+    config: ServerConfig,
 }
 
 impl ClientListener {
     // Maybe later remove Box<dyn std::error::Error> for a custom error type, but is this even needed?
-    pub fn new(_config: ServerConfig) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(config: ServerConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        log::info!("creating new client listener");
         Ok(Self {
             listener: TcpListener::bind("127.0.0.1:1234")?,
             pool: ThreadPoolBuilder::new().num_threads(20).build()?,
+            config: config,
         })
     }
     pub fn run(self) {
+        log::info!("listening for clients");
         let message_broadcaster = Arc::new(Mutex::new(Broadcaster::default().run()));
 
-        let mut key = 0;
+        let mut key = self.config.system_config.key_start();
         for stream in self.listener.incoming() {
+            log::info!("got connection");
             key += 1;
             match stream {
                 Ok(write_stream) => {
                     // Get the address of the stream that connected
-                    let mut read_port = match write_stream.peer_addr() {
+                    let mut read_addr = match write_stream.peer_addr() {
                         Ok(port) => port,
                         Err(error) => {
-                            eprintln!("Failed to get peer_addr!: {error}");
+                            log::warn!("failed to get peer_addr: {error}");
                             return;
                         }
                     };
                     // Set the port to the reading port (the client has opened this port, and is waiting for a connection on it)
-                    read_port.set_port(4321);
-                    let read_stream = match TcpStream::connect(read_port) {
+                    read_addr.set_port(self.config.net_config.read_port());
+                    let read_stream = match TcpStream::connect(read_addr) {
                         Ok(stream) => stream,
                         Err(error) => {
-                            eprintln!(
-                                "Error connecting to server read stream (client write): {error}"
+                            log::warn!(
+                                "error connecting to server read stream (client write): {error}"
                             );
                             return;
                         }
@@ -54,7 +59,7 @@ impl ClientListener {
                         Arc::new(Mutex::new(write_stream)),
                     );
 
-                    eprintln!("Estabilished Connection: {client_streams:?}");
+                    log::info!("Estabilished Connection: {client_streams:?}");
 
                     let mut client = Client::new(key, client_streams);
 
@@ -63,8 +68,8 @@ impl ClientListener {
                         move || client.run(message_broadcaster)
                     });
                 }
-                Err(e) => {
-                    eprintln!("Error accepting connection: {e}");
+                Err(error) => {
+                    log::warn!("failed to accept connection: {error}")
                 }
             }
         }

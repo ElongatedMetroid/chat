@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::message::Message;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Response {
     Message(Message),
     Error(String),

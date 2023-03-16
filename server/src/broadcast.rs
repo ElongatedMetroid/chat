@@ -8,6 +8,7 @@ use chat_core::{
     client_streams::ClientStreams, message::Message, response::Response, write::ChatWriter,
 };
 
+#[derive(Debug)]
 pub enum BroadcastMessage {
     /// Broadcast a message to all connected clients
     ChatMessage(Message),
@@ -28,19 +29,27 @@ pub struct Broadcaster {
 impl Broadcaster {
     /// Start the broadcaster thread, returns a `Sender<BroadcastMessage>` to send data to its thread
     pub fn run(mut self) -> Sender<BroadcastMessage> {
+        log::info!("running broadcaster");
+
         let (tx, rx): (Sender<BroadcastMessage>, Receiver<BroadcastMessage>) = mpsc::channel();
 
         thread::spawn(move || loop {
+            log::info!("broadcaster thread started");
             let message = rx.recv().unwrap();
+            log::info!("recieved a BroadcastMessage");
+            log::debug!("{message:?}");
 
             match message {
                 BroadcastMessage::ChatMessage(message) => {
+                    log::debug!("chat message broadcast recieved");
                     self.clients.broadcast(message);
                 }
                 BroadcastMessage::AddClient(client, key) => {
+                    log::debug!("add client broadcast recieved");
                     self.clients.insert(key, client);
                 }
                 BroadcastMessage::RemoveClient(key) => {
+                    log::debug!("remove client broadcast recieved");
                     self.clients.remove(&key);
                 }
             }
@@ -59,9 +68,13 @@ impl Broadcast for HashMap<usize, ClientStreams> {
     /// Broadcast a `Message` to all clients, if writing data to a client fails, the message will not be broadcasted to that
     /// client (the client is not removed).
     fn broadcast(&mut self, message: Message) {
+        log::info!("broadcasting message");
         let response = Response::Message(message);
+        log::debug!("created response: {response:?}");
 
         for client in self.values_mut() {
+            log::debug!("broadcasting to: {client:?}");
+            // Error is ignored since the client handler should handle what happens if a client fails
             let _ = client.write_data(&response);
         }
     }

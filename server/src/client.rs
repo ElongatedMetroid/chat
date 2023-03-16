@@ -38,13 +38,13 @@ impl Client {
         }
         impl Drop for Exit {
             fn drop(&mut self) {
-                print!("cleaning up client...  ");
+                log::info!("cleaning up client...  ");
                 self.message_broadcaster
                     .lock()
                     .unwrap()
                     .send(BroadcastMessage::RemoveClient(self.key))
                     .unwrap();
-                println!("removed client data");
+                log::info!("client removed");
             }
         }
 
@@ -57,6 +57,8 @@ impl Client {
             }
         };
 
+        log::debug!("broadcasting add client message");
+
         broadcaster
             .lock()
             .unwrap()
@@ -66,6 +68,8 @@ impl Client {
             ))
             .unwrap();
 
+        log::info!("client added to chat broadcaster");
+
         // Create a user
         let mut user = {
             // Get peer_addresses
@@ -73,6 +77,7 @@ impl Client {
             let peer_addresses = match peer_addresses {
                 (Ok(read), Ok(write)) => (read, write),
                 _ => {
+                    log::warn!("getting peer_addrs() of client failed");
                     self.streams
                         .write_data(&Response::Error(
                             "Could not get your ip-addresses!".to_owned(),
@@ -90,7 +95,7 @@ impl Client {
                 .build()
         };
 
-        println!("New client connected: {user:?}");
+        log::info!("new client connected: {user:?}");
 
         broadcaster
             .lock()
@@ -106,10 +111,12 @@ impl Client {
         loop {
             // Read request (Blocks thread until there is something to read)
             let request = self.streams.read_data::<Request>();
+            log::debug!("got request: {request:?}");
 
             let request = match request {
                 Ok(request) => request,
                 Err(error) => {
+                    log::debug!("bad request: {error}");
                     self.streams
                         .write_data(&Response::Error(format!("Bad request: {error}")))
                         .ok();
