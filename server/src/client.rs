@@ -1,11 +1,11 @@
 use std::sync::{mpsc::Sender, Arc, Mutex};
 
 use chat_core::{
-    client_streams::ClientStreams, message::Message, read::ChatReader, request::Request,
+    client_streams::ClientStreams, message::Message, read::ChatReader, request::{Request, RequestError},
     response::Response, user::User, value::Value, write::ChatWriter,
 };
 
-use crate::broadcast::BroadcastMessage;
+use crate::{broadcast::BroadcastMessage, config::ServerConfig};
 
 use lazy_static::lazy_static;
 
@@ -16,16 +16,28 @@ lazy_static! {
 pub struct Client {
     pub key: usize,
     pub streams: ClientStreams,
+    pub broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>,
+    pub config: Arc<ServerConfig>,
 }
 
 impl Client {
-    pub fn new(key: usize, streams: ClientStreams) -> Self {
-        Self { key, streams }
+    pub fn new(
+        key: usize,
+        streams: ClientStreams,
+        broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>,
+        config: Arc<ServerConfig>,
+    ) -> Self {
+        Self {
+            key,
+            streams,
+            broadcaster,
+            config,
+        }
     }
     pub fn key(&self) -> usize {
         self.key
     }
-    pub fn run(&mut self, broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>) {
+    pub fn run(&mut self) {
         /// This is strictly used only to make to sure that the
         /// client the corresponds to the key is removed from the
         /// HashMap on exiting this function. This is important
@@ -49,7 +61,7 @@ impl Client {
         }
 
         let _exit = {
-            let message_broadcaster = Arc::clone(&broadcaster);
+            let message_broadcaster = Arc::clone(&self.broadcaster);
 
             Exit {
                 message_broadcaster,
@@ -59,7 +71,7 @@ impl Client {
 
         log::debug!("broadcasting add client message");
 
-        broadcaster
+        self.broadcaster
             .lock()
             .unwrap()
             .send(BroadcastMessage::AddClient(
@@ -79,8 +91,8 @@ impl Client {
                 _ => {
                     log::warn!("getting peer_addrs() of client failed");
                     self.streams
-                        .write_data(&Response::Error(
-                            "Could not get your ip-addresses!".to_owned(),
+                        .write_data(&Response::Err(
+                            RequestError::Ip
                         ))
                         .ok();
                     return;
@@ -97,7 +109,7 @@ impl Client {
 
         log::info!("new client connected: {user:?}");
 
-        broadcaster
+        self.broadcaster
             .lock()
             .unwrap()
             .send(BroadcastMessage::ChatMessage(
@@ -118,7 +130,7 @@ impl Client {
                 Err(error) => {
                     log::debug!("bad request: {error}");
                     self.streams
-                        .write_data(&Response::Error(format!("Bad request: {error}")))
+                        .write_data(&Response::Err(RequestError::Bad(error.to_string())))
                         .ok();
                     return;
                 }
@@ -132,14 +144,14 @@ impl Client {
                         .build();
 
                     // Broadcast message to other clients
-                    broadcaster
+                    self.broadcaster
                         .lock()
                         .unwrap()
                         .send(BroadcastMessage::ChatMessage(message))
                         .unwrap();
                 }
                 Request::ChangeUserName(username) => {
-                    broadcaster
+                    self.broadcaster
                         .lock()
                         .unwrap()
                         .send(BroadcastMessage::ChatMessage(

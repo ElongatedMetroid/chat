@@ -34,7 +34,6 @@ impl Broadcaster {
         let (tx, rx): (Sender<BroadcastMessage>, Receiver<BroadcastMessage>) = mpsc::channel();
 
         thread::spawn(move || loop {
-            log::info!("broadcaster thread started");
             let message = rx.recv().unwrap();
             log::info!("recieved a BroadcastMessage");
             log::debug!("{message:?}");
@@ -55,6 +54,8 @@ impl Broadcaster {
             }
         });
 
+        log::info!("broadcaster thread started");
+
         tx
     }
 }
@@ -69,7 +70,7 @@ impl Broadcast for HashMap<usize, ClientStreams> {
     /// client (the client is not removed).
     fn broadcast(&mut self, message: Message) {
         log::info!("broadcasting message");
-        let response = Response::Message(message);
+        let response = Response::Ok(message);
         log::debug!("created response: {response:?}");
 
         for client in self.values_mut() {

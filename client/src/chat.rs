@@ -36,8 +36,8 @@ impl Chat {
             move || loop {
                 match client_streams.read_data::<Response>() {
                     Ok(response) => match response {
-                        Response::Message(message) => messages.lock().unwrap().push(message),
-                        Response::Error(error) => {
+                        Ok(message) => messages.lock().unwrap().push(message),
+                        Err(error) => {
                             eprintln!("Server returned error: {error}");
                             process::exit(1);
                         }
