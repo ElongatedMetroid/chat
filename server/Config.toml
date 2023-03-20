@@ -1,14 +1,30 @@
-[netconfig]
+[net_config]
 # Server will listen for clients on this port
 ip = "127.0.0.1:1234"
 # Server will bind [client_addr]:read_port and will use this
 # connection for reading data from the client
 read_port = 4321
 
-[systemconfig]
+[system_config]
 # Amount of threads that will be given to the server
 threads = 20
 # The number the keys assigned to clients will start at
 key_start = 0
 # Tells you the secrets to life
 verbose = true
+
+[message_guidelines]
+# Max size a message can be (in bytes)
+message_size = 4000
+# Can a message be just whitespace
+just_whitespace = false
+# Can a message have trailing whitespace
+trailing_whitespace = false
+
+[username_guidelines]
+# Max username length
+max_length = 10
+# Min username length
+min_length = 3
+# Can the username have whitespace
+whitespace = false

@@ -3,8 +3,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct ServerConfig {
-    pub net_config: NetConfig,
-    pub system_config: SystemConfig,
+    pub net: NetConfig,
+    pub system: SystemConfig,
+    pub message_guidelines: MessageGuidelines,
+    pub username_guidelines: UsernameGuidelines,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -44,6 +46,40 @@ impl Default for SystemConfig {
             threads: 20,
             key_start: 0,
             verbose: true,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MessageGuidelines {
+    message_size: usize,
+    just_whitespace: bool,
+    trailing_whitespace: bool,
+}
+
+impl Default for MessageGuidelines {
+    fn default() -> Self {
+        Self {
+            message_size: 4000,
+            just_whitespace: false,
+            trailing_whitespace: false,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UsernameGuidelines {
+    max_length: usize,
+    min_length: usize,
+    whitespace: bool,
+}
+
+impl Default for UsernameGuidelines {
+    fn default() -> Self {
+        Self {
+            max_length: 10,
+            min_length: 3,
+            whitespace: false,
         }
     }
 }

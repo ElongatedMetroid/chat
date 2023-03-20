@@ -21,14 +21,15 @@ impl ClientListener {
         Ok(Self {
             listener: TcpListener::bind("127.0.0.1:1234")?,
             pool: ThreadPoolBuilder::new().num_threads(20).build()?,
-            config: config,
+            config,
         })
     }
     pub fn run(self) {
         log::info!("listening for clients");
         let message_broadcaster = Arc::new(Mutex::new(Broadcaster::default().run()));
 
-        let mut key = self.config.system_config.key_start();
+        let config = Arc::new(self.config);
+        let mut key = config.system.key_start();
         for stream in self.listener.incoming() {
             log::info!("got connection");
             key += 1;
@@ -43,7 +44,7 @@ impl ClientListener {
                         }
                     };
                     // Set the port to the reading port (the client has opened this port, and is waiting for a connection on it)
-                    read_addr.set_port(self.config.net_config.read_port());
+                    read_addr.set_port(config.net.read_port());
                     let read_stream = match TcpStream::connect(read_addr) {
                         Ok(stream) => stream,
                         Err(error) => {
@@ -61,11 +62,10 @@ impl ClientListener {
 
                     log::info!("Estabilished Connection: {client_streams:?}");
 
-                    let mut client = Client::new(key, client_streams);
-
                     self.pool.spawn({
                         let message_broadcaster = Arc::clone(&message_broadcaster);
-                        move || client.run(message_broadcaster)
+                        let config = Arc::clone(&config);
+                        move || Client::new(key, client_streams, message_broadcaster, config).run()
                     });
                 }
                 Err(error) => {

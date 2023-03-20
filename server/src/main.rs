@@ -1,14 +1,11 @@
-use std::process;
+use std::{process, sync::Arc};
 
 use chat_core::config::Config;
+use log::LevelFilter;
 use server::{client_listener::ClientListener, config::ServerConfig};
 use simple_logger::SimpleLogger;
 
 fn main() {
-    SimpleLogger::new().init().unwrap();
-
-    log::info!("server starting...");
-
     let config = match ServerConfig::load() {
         Ok(config) => config,
         Err(error) => {
@@ -17,6 +14,15 @@ fn main() {
             ServerConfig::default()
         }
     };
+
+    SimpleLogger::new()
+        .with_level(if config.system.verbose() {
+            LevelFilter::Trace
+        } else {
+            LevelFilter::Warn
+        })
+        .init()
+        .unwrap();
 
     log::info!("config loaded");
 
