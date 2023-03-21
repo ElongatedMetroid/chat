@@ -16,7 +16,10 @@ use crate::{broadcast::BroadcastMessage, config::ServerConfig};
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref SERVER_USER: User = User::builder().id(0).username(Username::new(None, "SERVER").unwrap()).build();
+    static ref SERVER_USER: User = User::builder()
+        .id(0)
+        .username(Username::new(None, "SERVER").unwrap())
+        .build();
 }
 
 pub struct Client {
@@ -105,7 +108,13 @@ impl Client {
 
             // Build a user with a random name
             User::builder()
-                .username(Username::new(None, Value::String(format!("anonymous-{}", User::random_name()))).unwrap())
+                .username(
+                    Username::new(
+                        None,
+                        Value::String(format!("anonymous-{}", User::random_name())),
+                    )
+                    .unwrap(),
+                )
                 .id(self.key)
                 .addresses(Some(peer_addresses))
                 .build()

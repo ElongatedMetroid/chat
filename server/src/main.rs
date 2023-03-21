@@ -1,4 +1,4 @@
-use std::{process, sync::Arc};
+use std::process;
 
 use chat_core::config::Config;
 use log::LevelFilter;

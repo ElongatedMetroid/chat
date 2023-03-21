@@ -1,4 +1,7 @@
-use std::{fmt::{self, Display}, net::SocketAddr};
+use std::{
+    fmt::{self, Display},
+    net::SocketAddr,
+};
 
 use lazy_static::lazy_static;
 use rand::seq::SliceRandom;
@@ -70,8 +73,9 @@ impl Display for Username {
 }
 
 impl Username {
-    pub fn new<T>(guidelines: Option<&UsernameGuidelines>, name: T) -> Result<Self, UsernameError> 
-    where T: TryInto<String>
+    pub fn new<T>(guidelines: Option<&UsernameGuidelines>, name: T) -> Result<Self, UsernameError>
+    where
+        T: TryInto<String>,
     {
         let name: String = match name.try_into() {
             Ok(name) => name,
@@ -80,17 +84,15 @@ impl Username {
 
         if let Some(guidelines) = guidelines {
             if name.len() > guidelines.max_length() {
-                return Err(UsernameError::TooLong)
+                return Err(UsernameError::TooLong);
             } else if name.len() < guidelines.min_length() {
-                return Err(UsernameError::TooShort)
+                return Err(UsernameError::TooShort);
             } else if !guidelines.whitespace() && name.contains([' ', '\n', '\t', '\r']) {
-                return Err(UsernameError::Whitespace)
+                return Err(UsernameError::Whitespace);
             }
         }
-        
-        Ok(Self {
-            name
-        })
+
+        Ok(Self { name })
     }
     pub fn as_str(&self) -> &str {
         &self.name
@@ -151,7 +153,7 @@ pub struct UserBuilder {
 
 impl UserBuilder {
     pub fn username(mut self, username: Username) -> UserBuilder {
-        self.username = username.into();
+        self.username = username;
         self
     }
     pub fn id(mut self, id: usize) -> UserBuilder {
