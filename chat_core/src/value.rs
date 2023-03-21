@@ -1,23 +1,12 @@
-use std::{
-    error::Error,
-    fmt::{self, Display},
-};
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug, Serialize, Deserialize)]
 pub enum ValueError {
-    CannotConvertValue(&'static str),
-}
-
-impl Error for ValueError {}
-
-impl Display for ValueError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ValueError::CannotConvertValue(s) => write!(f, "cannot convert value to {s}"),
-        }
-    }
+    #[error("cannot convert value to {0}")]
+    CannotConvertValue(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -79,11 +68,11 @@ impl TryFrom<Value> for String {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::String(s) => Ok(s),
-            Value::Integer(_) => Err(ValueError::CannotConvertValue("int")),
-            Value::Float(_) => Err(ValueError::CannotConvertValue("float")),
-            Value::Boolean(_) => Err(ValueError::CannotConvertValue("bool")),
-            Value::Image(_) => Err(ValueError::CannotConvertValue("image")),
-            Value::File(_) => Err(ValueError::CannotConvertValue("file")),
+            Value::Integer(_) => Err(ValueError::CannotConvertValue("int".to_owned())),
+            Value::Float(_) => Err(ValueError::CannotConvertValue("float".to_owned())),
+            Value::Boolean(_) => Err(ValueError::CannotConvertValue("bool".to_owned())),
+            Value::Image(_) => Err(ValueError::CannotConvertValue("image".to_owned())),
+            Value::File(_) => Err(ValueError::CannotConvertValue("file".to_owned())),
         }
     }
 }

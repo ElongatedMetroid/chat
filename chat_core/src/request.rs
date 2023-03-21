@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::value::Value;
+use crate::{value::Value, user::UsernameError};
 
 #[derive(Error, Debug, Serialize, Deserialize)]
 pub enum RequestError {
@@ -11,6 +11,8 @@ pub enum RequestError {
     /// type can be known.
     #[error("bad request")]
     Bad(String),
+    #[error("bad username: {0}")]
+    Username(UsernameError)
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -1,4 +1,4 @@
-use chat_core::config::Config;
+use chat_core::{config::Config, user::UsernameGuidelines};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Deserialize, Serialize)]
@@ -50,6 +50,18 @@ impl Default for SystemConfig {
     }
 }
 
+impl SystemConfig {
+    pub fn threads(&self) -> usize {
+        self.threads
+    }
+    pub fn key_start(&self) -> usize {
+        self.key_start
+    }
+    pub fn verbose(&self) -> bool {
+        self.verbose
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct MessageGuidelines {
     message_size: usize,
@@ -67,32 +79,15 @@ impl Default for MessageGuidelines {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct UsernameGuidelines {
-    max_length: usize,
-    min_length: usize,
-    whitespace: bool,
-}
-
-impl Default for UsernameGuidelines {
-    fn default() -> Self {
-        Self {
-            max_length: 10,
-            min_length: 3,
-            whitespace: false,
-        }
+impl MessageGuidelines {
+    pub fn message_size(&self) -> usize {
+        self.message_size
     }
-}
-
-impl SystemConfig {
-    pub fn threads(&self) -> usize {
-        self.threads
+    pub fn just_whitespace(&self) -> bool {
+        self.just_whitespace
     }
-    pub fn key_start(&self) -> usize {
-        self.key_start
-    }
-    pub fn verbose(&self) -> bool {
-        self.verbose
+    pub fn trailing_whitespace(&self) -> bool {
+        self.trailing_whitespace
     }
 }
 

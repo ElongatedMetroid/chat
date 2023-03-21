@@ -1,8 +1,14 @@
 use std::sync::{mpsc::Sender, Arc, Mutex};
 
 use chat_core::{
-    client_streams::ClientStreams, message::Message, read::ChatReader, request::{Request, RequestError},
-    response::Response, user::User, value::Value, write::ChatWriter,
+    client_streams::ClientStreams,
+    message::Message,
+    read::ChatReader,
+    request::{Request, RequestError},
+    response::Response,
+    user::{User, Username},
+    value::Value,
+    write::ChatWriter,
 };
 
 use crate::{broadcast::BroadcastMessage, config::ServerConfig};
@@ -10,7 +16,7 @@ use crate::{broadcast::BroadcastMessage, config::ServerConfig};
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref SERVER_USER: User = User::builder().id(0).username("SERVER").build();
+    static ref SERVER_USER: User = User::builder().id(0).username(Username::new(None, "SERVER").unwrap()).build();
 }
 
 pub struct Client {
@@ -91,9 +97,7 @@ impl Client {
                 _ => {
                     log::warn!("getting peer_addrs() of client failed");
                     self.streams
-                        .write_data(&Response::Err(
-                            RequestError::Ip
-                        ))
+                        .write_data(&Response::Err(RequestError::Ip))
                         .ok();
                     return;
                 }
@@ -101,7 +105,7 @@ impl Client {
 
             // Build a user with a random name
             User::builder()
-                .username(format!("anonymous-{}", User::random_name()))
+                .username(Username::new(None, Value::String(format!("anonymous-{}", User::random_name()))).unwrap())
                 .id(self.key)
                 .addresses(Some(peer_addresses))
                 .build()
@@ -164,17 +168,17 @@ impl Client {
                         ))
                         .unwrap();
 
-                    user.set_username::<String>(match username.try_into() {
-                        Ok(username) => username,
-                        Err(error) => {
-                            self.streams
-                                .write_data(&format!(
-                                    "Cannot change username to non-string data: {error}"
-                                ))
-                                .ok();
-                            return;
-                        }
-                    });
+                    user.set_username(
+                        match Username::new(Some(&self.config.username_guidelines), username) {
+                            Ok(name) => name,
+                            Err(error) => {
+                                self.streams
+                                    .write_data(&Response::Err(RequestError::Username(error)))
+                                    .ok();
+                                return;
+                            }
+                        },
+                    );
                 }
                 Request::UserList => todo!(),
             }
