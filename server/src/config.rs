@@ -1,4 +1,4 @@
-use chat_core::{config::Config, user::UsernameGuidelines};
+use chat_core::{config::Config, user::UsernameGuidelines, message::MessageGuidelines};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Deserialize, Serialize)]
@@ -59,35 +59,6 @@ impl SystemConfig {
     }
     pub fn verbose(&self) -> bool {
         self.verbose
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct MessageGuidelines {
-    message_size: usize,
-    just_whitespace: bool,
-    trailing_whitespace: bool,
-}
-
-impl Default for MessageGuidelines {
-    fn default() -> Self {
-        Self {
-            message_size: 4000,
-            just_whitespace: false,
-            trailing_whitespace: false,
-        }
-    }
-}
-
-impl MessageGuidelines {
-    pub fn message_size(&self) -> usize {
-        self.message_size
-    }
-    pub fn just_whitespace(&self) -> bool {
-        self.just_whitespace
-    }
-    pub fn trailing_whitespace(&self) -> bool {
-        self.trailing_whitespace
     }
 }
 

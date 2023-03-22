@@ -20,6 +20,10 @@ message_size = 4000
 just_whitespace = false
 # Can a message have trailing whitespace
 trailing_whitespace = false
+# Can a message have leading whitespace
+leading_whitespace = false
+# Can a message be completely empty
+empty = false
 
 [username_guidelines]
 # Max username length

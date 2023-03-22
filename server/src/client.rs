@@ -127,7 +127,7 @@ impl Client {
             .unwrap()
             .send(BroadcastMessage::ChatMessage(
                 Message::builder()
-                    .from(SERVER_USER.clone())
+                    .from_who(SERVER_USER.clone())
                     .payload(Value::String(format!("{user} has joined")))
                     .build(),
             ))
@@ -152,7 +152,8 @@ impl Client {
             match request {
                 Request::SendMessage(message) => {
                     let message = Message::builder()
-                        .from(user.hide_addr())
+                        .with_guidelines(&self.config.message_guidelines)
+                        .from_who(user.hide_addr())
                         .payload(message)
                         .build();
 
@@ -169,7 +170,7 @@ impl Client {
                         .unwrap()
                         .send(BroadcastMessage::ChatMessage(
                             Message::builder()
-                                .from(SERVER_USER.clone())
+                                .from_who(SERVER_USER.clone())
                                 .payload(Value::String(format!(
                                     "Requesting change username. {user} -> {username}"
                                 )))
