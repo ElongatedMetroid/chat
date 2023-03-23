@@ -1,4 +1,4 @@
-use chat_core::{config::Config, user::UsernameGuidelines, message::MessageGuidelines};
+use chat_core::{config::Config, message::MessageGuidelines, user::UsernameGuidelines};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Deserialize, Serialize)]

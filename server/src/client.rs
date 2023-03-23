@@ -129,7 +129,8 @@ impl Client {
                 Message::builder()
                     .from_who(SERVER_USER.clone())
                     .payload(Value::String(format!("{user} has joined")))
-                    .build(),
+                    .build()
+                    .unwrap(),
             ))
             .unwrap();
 
@@ -151,11 +152,21 @@ impl Client {
 
             match request {
                 Request::SendMessage(message) => {
-                    let message = Message::builder()
+                    let message = match Message::builder()
                         .with_guidelines(&self.config.message_guidelines)
                         .from_who(user.hide_addr())
                         .payload(message)
-                        .build();
+                        .build()
+                    {
+                        Ok(message) => message,
+                        Err(error) => {
+                            log::info!("message did not follow guidelines");
+                            self.streams
+                                .write_data(&Response::Err(RequestError::Message(error)))
+                                .ok();
+                            return;
+                        }
+                    };
 
                     // Broadcast message to other clients
                     self.broadcaster
@@ -174,7 +185,8 @@ impl Client {
                                 .payload(Value::String(format!(
                                     "Requesting change username. {user} -> {username}"
                                 )))
-                                .build(),
+                                .build()
+                                .unwrap(),
                         ))
                         .unwrap();
 

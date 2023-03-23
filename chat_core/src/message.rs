@@ -1,8 +1,21 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::{user::User, value::Value};
+
+#[derive(Debug, Error, Serialize, Deserialize)]
+pub enum MessageError {
+    #[error("message is empty")]
+    Empty,
+    #[error("message is just whitespace")]
+    JustWhitespace,
+    #[error("message has leading whitespace")]
+    LeadingWhitespace,
+    #[error("message had trailing whitespace")]
+    TrailingWhitespace,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct MessageGuidelines {
@@ -68,6 +81,8 @@ pub struct MessageBuilder<'a> {
     from: Option<User>,
     // to: Option<Vec<User>>,
     payload: Option<Value>,
+
+    guideline_error: Option<MessageError>,
 }
 
 impl<'a> MessageBuilder<'a> {
@@ -90,22 +105,32 @@ impl<'a> MessageBuilder<'a> {
                 // A message cannot be empty but the message is empty
                 if !guidelines.empty() && text_message.is_empty() {
                     log::debug!("message cannot be empty but is empty");
-                    // Return err
-                } 
+                    self.guideline_error = Some(MessageError::Empty);
+                }
                 // A message cannot be just whitespace
-                if !guidelines.just_whitespace() && text_message.chars().all(|c| c.is_whitespace()) {
+                else if !guidelines.just_whitespace()
+                    && text_message.chars().all(|c| c.is_whitespace())
+                {
                     log::debug!("message cannot be just whitespace but is just whitespace");
-
+                    self.guideline_error = Some(MessageError::JustWhitespace)
                 }
                 // A message cannot have trailing whitespace but the last character is whitespace
-                if !guidelines.trailing_whitespace() && text_message.chars().rev().next().unwrap().is_whitespace() {
-                    log::debug!("message cannot have trailing whitespace but has trailing whitespace");
-
+                else if !guidelines.trailing_whitespace()
+                    && text_message.chars().rev().next().unwrap().is_whitespace()
+                {
+                    log::debug!(
+                        "message cannot have trailing whitespace but has trailing whitespace"
+                    );
+                    self.guideline_error = Some(MessageError::TrailingWhitespace)
                 }
                 // A message cannot of leading whitespace but the first character is leading whitespace
-                if !guidelines.leading_whitespace() && text_message.chars().next().unwrap().is_whitespace() {
-                    log::debug!("message cannot have leading whitespace but has leading whitespace");
-
+                else if !guidelines.leading_whitespace()
+                    && text_message.chars().next().unwrap().is_whitespace()
+                {
+                    log::debug!(
+                        "message cannot have leading whitespace but has leading whitespace"
+                    );
+                    self.guideline_error = Some(MessageError::LeadingWhitespace)
                 }
             }
         }
@@ -114,10 +139,13 @@ impl<'a> MessageBuilder<'a> {
         self
     }
     /// Will panic if you did not set all values
-    pub fn build(self) -> Message {
-        Message {
-            from: self.from.unwrap(),
-            /* to: self.to.unwrap(), */ payload: self.payload.unwrap(),
+    pub fn build(self) -> Result<Message, MessageError> {
+        match self.guideline_error {
+            Some(error) => Err(error),
+            None => Ok(Message {
+                from: self.from.unwrap(),
+                /* to: self.to.unwrap(), */ payload: self.payload.unwrap(),
+            }),
         }
     }
 }
