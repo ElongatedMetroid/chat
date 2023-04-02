@@ -3,7 +3,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{user::User, value::Value};
+use crate::{guidelines::AgainstGuidelines, user::User, value::Value};
 
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum MessageError {
@@ -15,6 +15,8 @@ pub enum MessageError {
     LeadingWhitespace,
     #[error("message had trailing whitespace")]
     TrailingWhitespace,
+    #[error("messages can only be text")]
+    TextOnly,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -24,6 +26,7 @@ pub struct MessageGuidelines {
     trailing_whitespace: bool,
     leading_whitespace: bool,
     empty: bool,
+    text_only: bool,
 }
 
 impl Default for MessageGuidelines {
@@ -34,6 +37,7 @@ impl Default for MessageGuidelines {
             trailing_whitespace: false,
             leading_whitespace: false,
             empty: false,
+            text_only: true,
         }
     }
 }
@@ -54,6 +58,9 @@ impl MessageGuidelines {
     pub fn empty(&self) -> bool {
         self.empty
     }
+    pub fn text_only(&self) -> bool {
+        self.text_only
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -70,26 +77,60 @@ impl fmt::Display for Message {
 }
 
 impl Message {
-    pub fn builder<'a>() -> MessageBuilder<'a> {
+    pub fn builder() -> MessageBuilder {
         MessageBuilder::default()
     }
 }
 
+impl AgainstGuidelines<MessageGuidelines> for Message {
+    type Error = MessageError;
+
+    fn against_guidelines(self, guidelines: &MessageGuidelines) -> Result<Self, Self::Error> {
+        if let Value::String(text_message) = &self.payload {
+            // A message cannot be empty but the message is empty
+            if !guidelines.empty() && text_message.is_empty() {
+                log::debug!("message cannot be empty but is empty");
+                return Err(MessageError::Empty);
+            }
+            // A message cannot be just whitespace
+            else if !guidelines.just_whitespace()
+                && text_message.chars().all(|c| c.is_whitespace())
+            {
+                log::debug!("message cannot be just whitespace but is just whitespace");
+                return Err(MessageError::JustWhitespace);
+            }
+            // A message cannot have trailing whitespace but the last character is whitespace
+            else if !guidelines.trailing_whitespace()
+                && text_message.chars().rev().next().unwrap().is_whitespace()
+            {
+                log::debug!("message cannot have trailing whitespace but has trailing whitespace");
+                return Err(MessageError::TrailingWhitespace);
+            }
+            // A message cannot of leading whitespace but the first character is leading whitespace
+            else if !guidelines.leading_whitespace()
+                && text_message.chars().next().unwrap().is_whitespace()
+            {
+                log::debug!("message cannot have leading whitespace but has leading whitespace");
+                return Err(MessageError::LeadingWhitespace);
+            }
+        } else {
+            if guidelines.text_only() {
+                return Err(MessageError::TextOnly);
+            }
+        }
+
+        Ok(self)
+    }
+}
+
 #[derive(Default)]
-pub struct MessageBuilder<'a> {
-    guidelines: Option<&'a MessageGuidelines>,
+pub struct MessageBuilder {
     from: Option<User>,
     // to: Option<Vec<User>>,
     payload: Option<Value>,
-
-    guideline_error: Option<MessageError>,
 }
 
-impl<'a> MessageBuilder<'a> {
-    pub fn with_guidelines(mut self, guidelines: &'a MessageGuidelines) -> Self {
-        self.guidelines = Some(guidelines);
-        self
-    }
+impl MessageBuilder {
     pub fn from_who(mut self, from: User) -> Self {
         self.from = Some(from);
         self
@@ -99,53 +140,14 @@ impl<'a> MessageBuilder<'a> {
     //     self
     // }
     pub fn payload(mut self, payload: Value) -> Self {
-        if let Some(guidelines) = self.guidelines {
-            // Guidelines that only apply to a string message
-            if let Value::String(text_message) = &payload {
-                // A message cannot be empty but the message is empty
-                if !guidelines.empty() && text_message.is_empty() {
-                    log::debug!("message cannot be empty but is empty");
-                    self.guideline_error = Some(MessageError::Empty);
-                }
-                // A message cannot be just whitespace
-                else if !guidelines.just_whitespace()
-                    && text_message.chars().all(|c| c.is_whitespace())
-                {
-                    log::debug!("message cannot be just whitespace but is just whitespace");
-                    self.guideline_error = Some(MessageError::JustWhitespace)
-                }
-                // A message cannot have trailing whitespace but the last character is whitespace
-                else if !guidelines.trailing_whitespace()
-                    && text_message.chars().rev().next().unwrap().is_whitespace()
-                {
-                    log::debug!(
-                        "message cannot have trailing whitespace but has trailing whitespace"
-                    );
-                    self.guideline_error = Some(MessageError::TrailingWhitespace)
-                }
-                // A message cannot of leading whitespace but the first character is leading whitespace
-                else if !guidelines.leading_whitespace()
-                    && text_message.chars().next().unwrap().is_whitespace()
-                {
-                    log::debug!(
-                        "message cannot have leading whitespace but has leading whitespace"
-                    );
-                    self.guideline_error = Some(MessageError::LeadingWhitespace)
-                }
-            }
-        }
-
         self.payload = Some(payload);
         self
     }
     /// Will panic if you did not set all values
-    pub fn build(self) -> Result<Message, MessageError> {
-        match self.guideline_error {
-            Some(error) => Err(error),
-            None => Ok(Message {
-                from: self.from.unwrap(),
-                /* to: self.to.unwrap(), */ payload: self.payload.unwrap(),
-            }),
+    pub fn build(self) -> Message {
+        Message {
+            from: self.from.unwrap(),
+            /* to: self.to.unwrap(), */ payload: self.payload.unwrap(),
         }
     }
 }

@@ -24,6 +24,8 @@ trailing_whitespace = false
 leading_whitespace = false
 # Can a message be completely empty
 empty = false
+# Can messages only be text
+text_only = true
 
 [username_guidelines]
 # Max username length
@@ -32,3 +34,5 @@ max_length = 10
 min_length = 3
 # Can the username have whitespace
 whitespace = false
+# Can username only be text
+text_only = true

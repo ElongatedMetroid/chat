@@ -9,7 +9,7 @@ pub enum ValueError {
     CannotConvertValue(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Value {
     String(String),
     Integer(i64),

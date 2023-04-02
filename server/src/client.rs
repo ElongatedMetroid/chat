@@ -2,6 +2,7 @@ use std::sync::{mpsc::Sender, Arc, Mutex};
 
 use chat_core::{
     client_streams::ClientStreams,
+    guidelines::AgainstGuidelines,
     message::Message,
     read::ChatReader,
     request::{Request, RequestError},
@@ -18,7 +19,7 @@ use lazy_static::lazy_static;
 lazy_static! {
     static ref SERVER_USER: User = User::builder()
         .id(0)
-        .username(Username::new(None, "SERVER").unwrap())
+        .username(Username::new("SERVER"))
         .build();
 }
 
@@ -108,13 +109,10 @@ impl Client {
 
             // Build a user with a random name
             User::builder()
-                .username(
-                    Username::new(
-                        None,
-                        Value::String(format!("anonymous-{}", User::random_name())),
-                    )
-                    .unwrap(),
-                )
+                .username(Username::new(Value::String(format!(
+                    "anonymous-{}",
+                    User::random_name()
+                ))))
                 .id(self.key)
                 .addresses(Some(peer_addresses))
                 .build()
@@ -129,8 +127,7 @@ impl Client {
                 Message::builder()
                     .from_who(SERVER_USER.clone())
                     .payload(Value::String(format!("{user} has joined")))
-                    .build()
-                    .unwrap(),
+                    .build(),
             ))
             .unwrap();
 
@@ -153,10 +150,10 @@ impl Client {
             match request {
                 Request::SendMessage(message) => {
                     let message = match Message::builder()
-                        .with_guidelines(&self.config.message_guidelines)
                         .from_who(user.hide_addr())
                         .payload(message)
                         .build()
+                        .against_guidelines(&self.config.message_guidelines)
                     {
                         Ok(message) => message,
                         Err(error) => {
@@ -185,13 +182,14 @@ impl Client {
                                 .payload(Value::String(format!(
                                     "Requesting change username. {user} -> {username}"
                                 )))
-                                .build()
-                                .unwrap(),
+                                .build(),
                         ))
                         .unwrap();
 
                     user.set_username(
-                        match Username::new(Some(&self.config.username_guidelines), username) {
+                        match Username::new(username)
+                            .against_guidelines(&self.config.username_guidelines)
+                        {
                             Ok(name) => name,
                             Err(error) => {
                                 self.streams

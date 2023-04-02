@@ -9,6 +9,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use toml::value::Array;
 
+use crate::{guidelines::AgainstGuidelines, value::Value};
+
+// To have the names loaded at runtime since (A) there is not need to edit them, and (B) there is not a good place to
+// load them in.
 lazy_static! {
     static ref NAMES: Vec<toml::Value> = {
         #[derive(Deserialize, Serialize)]
@@ -25,6 +29,7 @@ pub struct UsernameGuidelines {
     max_length: usize,
     min_length: usize,
     whitespace: bool,
+    text_only: bool,
 }
 
 impl Default for UsernameGuidelines {
@@ -33,6 +38,7 @@ impl Default for UsernameGuidelines {
             max_length: 10,
             min_length: 3,
             whitespace: false,
+            text_only: true,
         }
     }
 }
@@ -47,12 +53,15 @@ impl UsernameGuidelines {
     pub fn whitespace(&self) -> bool {
         self.whitespace
     }
+    pub fn text_only(&self) -> bool {
+        self.text_only
+    }
 }
 
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum UsernameError {
-    #[error("tried to change username to non-string data")]
-    NonStringData,
+    #[error("tried to change username to non-text data")]
+    TextOnly,
     #[error("username is too long")]
     TooLong,
     #[error("username is too short")]
@@ -61,9 +70,17 @@ pub enum UsernameError {
     Whitespace,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Username {
-    name: String,
+    name: Value,
+}
+
+impl Default for Username {
+    fn default() -> Self {
+        Self {
+            name: Value::String(String::new()),
+        }
+    }
 }
 
 impl Display for Username {
@@ -73,16 +90,19 @@ impl Display for Username {
 }
 
 impl Username {
-    pub fn new<T>(guidelines: Option<&UsernameGuidelines>, name: T) -> Result<Self, UsernameError>
+    pub fn new<T>(name: T) -> Self
     where
-        T: TryInto<String>,
+        T: Into<Value>,
     {
-        let name: String = match name.try_into() {
-            Ok(name) => name,
-            Err(_) => return Err(UsernameError::NonStringData),
-        };
+        Self { name: name.into() }
+    }
+}
 
-        if let Some(guidelines) = guidelines {
+impl AgainstGuidelines<UsernameGuidelines> for Username {
+    type Error = UsernameError;
+
+    fn against_guidelines(self, guidelines: &UsernameGuidelines) -> Result<Self, Self::Error> {
+        if let Value::String(name) = &self.name {
             if name.len() > guidelines.max_length() {
                 return Err(UsernameError::TooLong);
             } else if name.len() < guidelines.min_length() {
@@ -90,12 +110,13 @@ impl Username {
             } else if !guidelines.whitespace() && name.contains([' ', '\n', '\t', '\r']) {
                 return Err(UsernameError::Whitespace);
             }
+        } else {
+            if guidelines.text_only {
+                return Err(UsernameError::TextOnly);
+            }
         }
 
-        Ok(Self { name })
-    }
-    pub fn as_str(&self) -> &str {
-        &self.name
+        Ok(self)
     }
 }
 
@@ -130,8 +151,8 @@ impl User {
         new.addresses = None;
         new
     }
-    pub fn username(&self) -> &str {
-        self.username.as_str()
+    pub fn username(&self) -> &Username {
+        &self.username
     }
     pub fn set_username(&mut self, username: Username) {
         self.username = username

@@ -1,5 +1,6 @@
 pub mod client_streams;
 pub mod config;
+pub mod guidelines;
 pub mod message;
 pub mod read;
 pub mod request;
