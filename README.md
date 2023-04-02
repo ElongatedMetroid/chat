@@ -1,8 +1,9 @@
 # chat
-Tcp chat made in Rust with a GUI
+Tcp chat made in Rust with a GUI client
 
 ## TODO
-Create guidelines for messages and username (data that is sent in general), also guidlines for max amount of clients
 Clean up all code
 username colors
-On a client connect the server will send its guidelines, this means the server dropping anything that does not follow these will not be as bad of a practice.
+Move initial connection with client to seperate method
+    - Includes code the is only executed once (that relates to the client)
+    - In this send the guidelines for the messages and usernames
