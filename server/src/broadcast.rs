@@ -5,7 +5,7 @@ use std::{
 };
 
 use chat_core::{
-    client_streams::ClientStreams, message::Message, response::Response, write::ChatWriter,
+    message::Message, read_write_streams::ReadWriteStreams, response::Response, write::ChatWriter,
 };
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ pub enum BroadcastMessage {
     /// Broadcast a message to all connected clients
     ChatMessage(Message),
     /// Add client along with a corresponding key
-    AddClient(ClientStreams, usize),
+    AddClient(ReadWriteStreams, usize),
     /// Remove client with id
     RemoveClient(usize),
 }
@@ -23,7 +23,7 @@ pub enum BroadcastMessage {
 /// clients such as, broadcasting messages to all clients.
 #[derive(Default)]
 pub struct Broadcaster {
-    clients: HashMap<usize, ClientStreams>,
+    clients: HashMap<usize, ReadWriteStreams>,
 }
 
 impl Broadcaster {
@@ -65,7 +65,7 @@ pub trait Broadcast {
     fn broadcast(&mut self, message: Message);
 }
 
-impl Broadcast for HashMap<usize, ClientStreams> {
+impl Broadcast for HashMap<usize, ReadWriteStreams> {
     /// Broadcast a `Message` to all clients, if writing data to a client fails, the message will not be broadcasted to that
     /// client (the client is not removed).
     fn broadcast(&mut self, message: Message) {

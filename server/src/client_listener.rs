@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use chat_core::client_streams::ClientStreams;
+use chat_core::read_write_streams::ReadWriteStreams;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{broadcast::Broadcaster, client::Client, config::ServerConfig};
@@ -54,18 +54,26 @@ impl ClientListener {
                             return;
                         }
                     };
-                    // Create a new ClientStreams enum with the Server variant
-                    let client_streams = ClientStreams::Server(
-                        Arc::new(Mutex::new(read_stream)),
-                        Arc::new(Mutex::new(write_stream)),
-                    );
+                    // Create a new ReadWriteStreams enum with the Server variant
+                    let client_streams = ReadWriteStreams {
+                        read: Arc::new(Mutex::new(read_stream)),
+                        write: Arc::new(Mutex::new(write_stream)),
+                    };
 
                     log::info!("Estabilished Connection: {client_streams:?}");
 
                     self.pool.spawn({
                         let message_broadcaster = Arc::clone(&message_broadcaster);
                         let config = Arc::clone(&config);
-                        move || Client::new(key, client_streams, message_broadcaster, config).run()
+                        move || {
+                            Client::make_connection(
+                                key,
+                                client_streams,
+                                message_broadcaster,
+                                config,
+                            )
+                            .run()
+                        }
                     });
                 }
                 Err(error) => {

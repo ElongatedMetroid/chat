@@ -1,8 +1,8 @@
-pub mod client_streams;
 pub mod config;
 pub mod guidelines;
 pub mod message;
 pub mod read;
+pub mod read_write_streams;
 pub mod request;
 pub mod response;
 pub mod user;

@@ -1,5 +1,5 @@
 use chat_core::{
-    client_streams::ClientStreams,
+    read_write_streams::ReadWriteStreams,
     config::{Config, ConfigError},
     request::Request,
     value::Value,
@@ -13,7 +13,7 @@ use super::ClientConfig;
 pub struct ConfigGui {
     config: Option<ClientConfig>,
     config_handled: bool,
-    client_streams: ClientStreams,
+    client_streams: ReadWriteStreams,
 
     create_config_data: CreateConfigData,
 }
@@ -28,7 +28,7 @@ impl ConfigGui {
     /// Returns a new `ConfigGui`, this will open a config gui with the Config::load() function. If the config cannot be
     /// found an error is not returned since creating a config will be handled in the update_gui() method. However an
     /// error will be returned if something other than `io::ErrorKind::NotFound` is returned from Config::load().
-    pub fn new(client_streams: ClientStreams) -> Result<Self, ConfigError> {
+    pub fn new(client_streams: ReadWriteStreams) -> Result<Self, ConfigError> {
         let config = ConfigGui {
             config: match ClientConfig::load() {
                 Ok(config) => Some(config),

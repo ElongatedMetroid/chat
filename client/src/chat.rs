@@ -1,5 +1,5 @@
 use chat_core::{
-    client_streams::ClientStreams, message::Message, read::ChatReader, request::Request,
+    read_write_streams::ReadWriteStreams, message::Message, read::ChatReader, request::Request,
     response::Response, value::Value, write::ChatWriter,
 };
 use egui::{Key, Modifiers, ScrollArea, TextEdit, Window};
@@ -10,14 +10,14 @@ use std::{
 };
 
 pub struct Chat {
-    client_streams: ClientStreams,
+    client_streams: ReadWriteStreams,
     message_text: String,
     messages: Arc<Mutex<Vec<Message>>>,
 }
 
 impl Chat {
     /// Create a new ChatGui, and start message checking thread
-    pub fn new(client_streams: ClientStreams) -> Self {
+    pub fn new(client_streams: ReadWriteStreams) -> Self {
         let chat_gui = Self {
             client_streams,
             message_text: String::new(),
@@ -67,7 +67,7 @@ impl Chat {
 
             ui.separator();
 
-            if self.message_text.bytes().len() as u64 > <ClientStreams as ChatWriter>::byte_limit()
+            if self.message_text.bytes().len() as u64 > <ReadWriteStreams as ChatWriter>::byte_limit()
             {
                 ui.label("Message Too Long!");
                 ui.separator();

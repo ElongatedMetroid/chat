@@ -1,10 +1,10 @@
 use std::sync::{mpsc::Sender, Arc, Mutex};
 
 use chat_core::{
-    client_streams::ClientStreams,
     guidelines::AgainstGuidelines,
     message::Message,
     read::ChatReader,
+    read_write_streams::ReadWriteStreams,
     request::{Request, RequestError},
     response::Response,
     user::{User, Username},
@@ -25,15 +25,15 @@ lazy_static! {
 
 pub struct Client {
     pub key: usize,
-    pub streams: ClientStreams,
+    pub streams: ReadWriteStreams,
     pub broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>,
     pub config: Arc<ServerConfig>,
 }
 
 impl Client {
-    pub fn new(
+    pub fn make_connection(
         key: usize,
-        streams: ClientStreams,
+        streams: ReadWriteStreams,
         broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>,
         config: Arc<ServerConfig>,
     ) -> Self {

@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use chat_core::client_streams::ClientStreams;
+use chat_core::read_write_streams::ReadWriteStreams;
 use egui::CentralPanel;
 
 use crate::{chat::Chat, config::gui::ConfigGui};
@@ -24,7 +24,7 @@ impl App {
         let write = TcpListener::bind(write_port).unwrap().accept().unwrap().0;
 
         let client_streams =
-            ClientStreams::Client(Arc::new(Mutex::new(read)), Arc::new(Mutex::new(write)));
+            ReadWriteStreams { read: Arc::new(Mutex::new(read)), write: Arc::new(Mutex::new(write)) };
 
         eprintln!("Estabilished Connection: {client_streams:#?}");
 
