@@ -1,9 +1,8 @@
 use std::{
-    net::{TcpListener, TcpStream},
+    net::TcpListener,
     sync::{Arc, Mutex},
 };
 
-use chat_core::read_write_streams::ReadWriteStreams;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{broadcast::Broadcaster, client::Client, config::ServerConfig};
@@ -34,44 +33,23 @@ impl ClientListener {
             log::info!("got connection");
             key += 1;
             match stream {
-                Ok(write_stream) => {
-                    // Get the address of the stream that connected
-                    let mut read_addr = match write_stream.peer_addr() {
-                        Ok(port) => port,
-                        Err(error) => {
-                            log::warn!("failed to get peer_addr: {error}");
-                            return;
-                        }
-                    };
-                    // Set the port to the reading port (the client has opened this port, and is waiting for a connection on it)
-                    read_addr.set_port(config.net.read_port());
-                    let read_stream = match TcpStream::connect(read_addr) {
-                        Ok(stream) => stream,
-                        Err(error) => {
-                            log::warn!(
-                                "error connecting to server read stream (client write): {error}"
-                            );
-                            return;
-                        }
-                    };
-                    // Create a new ReadWriteStreams enum with the Server variant
-                    let client_streams = ReadWriteStreams {
-                        read: Arc::new(Mutex::new(read_stream)),
-                        write: Arc::new(Mutex::new(write_stream)),
-                    };
-
-                    log::info!("Estabilished Connection: {client_streams:?}");
-
+                Ok(stream) => {
                     self.pool.spawn({
                         let message_broadcaster = Arc::clone(&message_broadcaster);
                         let config = Arc::clone(&config);
                         move || {
-                            Client::make_connection(
+                            match Client::make_connection(
                                 key,
-                                client_streams,
+                                stream,
                                 message_broadcaster,
                                 config,
-                            )
+                            ) {
+                                Ok(client) => client,
+                                Err(error) => {
+                                    log::error!("failed to create client: {error}");
+                                    return;
+                                },
+                            }
                             .run()
                         }
                     });

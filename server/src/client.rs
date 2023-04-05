@@ -1,10 +1,10 @@
-use std::sync::{mpsc::Sender, Arc, Mutex};
+use std::{sync::{mpsc::Sender, Arc, Mutex}, net::TcpStream, io};
 
 use chat_core::{
     guidelines::AgainstGuidelines,
     message::Message,
     read::ChatReader,
-    read_write_streams::ReadWriteStreams,
+    read_write_streams::{ReadWriteStreams, ConnectPeerStream},
     request::{Request, RequestError},
     response::Response,
     user::{User, Username},
@@ -33,54 +33,24 @@ pub struct Client {
 impl Client {
     pub fn make_connection(
         key: usize,
-        streams: ReadWriteStreams,
+        stream: TcpStream,
         broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>,
         config: Arc<ServerConfig>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, io::Error> {
+        let streams = stream.connect_peer_stream(config.net.read_port())?;
+
+        Ok(Self {
             key,
             streams,
             broadcaster,
             config,
-        }
+        })
     }
     pub fn key(&self) -> usize {
         self.key
     }
-    pub fn run(&mut self) {
-        /// This is strictly used only to make to sure that the
-        /// client the corresponds to the key is removed from the
-        /// HashMap on exiting this function. This is important
-        /// because not removing a client will mean wasted memory
-        /// and broadcasting messages would fail everytime.
-        /// https://rust-unofficial.github.io/patterns/idioms/dtor-finally.html
-        struct Exit {
-            message_broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>,
-            key: usize,
-        }
-        impl Drop for Exit {
-            fn drop(&mut self) {
-                log::info!("cleaning up client...  ");
-                self.message_broadcaster
-                    .lock()
-                    .unwrap()
-                    .send(BroadcastMessage::RemoveClient(self.key))
-                    .unwrap();
-                log::info!("client removed");
-            }
-        }
-
-        let _exit = {
-            let message_broadcaster = Arc::clone(&self.broadcaster);
-
-            Exit {
-                message_broadcaster,
-                key: self.key,
-            }
-        };
-
-        log::debug!("broadcasting add client message");
-
+    /// Initial client code that is only ran once, very messy in how it works now but will be fixed later
+    pub fn initial_connect(&mut self) -> Result<User, ()> {
         self.broadcaster
             .lock()
             .unwrap()
@@ -93,7 +63,7 @@ impl Client {
         log::info!("client added to chat broadcaster");
 
         // Create a user
-        let mut user = {
+        let user = {
             // Get peer_addresses
             let peer_addresses = self.streams.peer_addrs();
             let peer_addresses = match peer_addresses {
@@ -103,7 +73,7 @@ impl Client {
                     self.streams
                         .write_data(&Response::Err(RequestError::Ip))
                         .ok();
-                    return;
+                    return Err(());
                 }
             };
 
@@ -130,6 +100,48 @@ impl Client {
                     .build(),
             ))
             .unwrap();
+
+        Ok(user)
+    }
+    pub fn run(&mut self) {
+        /// This is strictly used only to make to sure that the
+        /// client the corresponds to the key is removed from the
+        /// HashMap on exiting this function. This is important
+        /// because not removing a client will mean wasted memory
+        /// and broadcasting messages would fail everytime.
+        /// https://rust-unofficial.github.io/patterns/idioms/dtor-finally.html
+        struct Exit {
+            message_broadcaster: Arc<Mutex<Sender<BroadcastMessage>>>,
+            key: usize,
+        }
+        impl Drop for Exit {
+            fn drop(&mut self) {
+                log::info!("cleaning up client...  ");
+                self.message_broadcaster
+                    .lock()
+                    .unwrap()
+                    .send(BroadcastMessage::RemoveClient(self.key))
+                    .unwrap();
+                log::info!("client removed");
+            }
+        }
+
+        let mut user = match self.initial_connect() {
+            Ok(user) => user,
+            // THIS METHOD HANDLES RETURNING AN ERROR RESPONSE!
+            Err(_) => return,
+        };
+
+        let _exit = {
+            let message_broadcaster = Arc::clone(&self.broadcaster);
+
+            Exit {
+                message_broadcaster,
+                key: self.key,
+            }
+        };
+
+        log::debug!("broadcasting add client message");
 
         loop {
             // Read request (Blocks thread until there is something to read)
