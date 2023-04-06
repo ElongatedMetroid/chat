@@ -51,6 +51,7 @@ impl Client {
     }
     /// Initial client code that is only ran once, very messy in how it works now but will be fixed later
     pub fn initial_connect(&mut self) -> Result<User, ()> {
+        log::debug!("broadcasting add client message");
         self.broadcaster
             .lock()
             .unwrap()
@@ -126,12 +127,6 @@ impl Client {
             }
         }
 
-        let mut user = match self.initial_connect() {
-            Ok(user) => user,
-            // THIS METHOD HANDLES RETURNING AN ERROR RESPONSE!
-            Err(_) => return,
-        };
-
         let _exit = {
             let message_broadcaster = Arc::clone(&self.broadcaster);
 
@@ -141,7 +136,11 @@ impl Client {
             }
         };
 
-        log::debug!("broadcasting add client message");
+        let mut user = match self.initial_connect() {
+            Ok(user) => user,
+            // THIS METHOD HANDLES RETURNING AN ERROR RESPONSE!
+            Err(_) => return,
+        };
 
         loop {
             // Read request (Blocks thread until there is something to read)
